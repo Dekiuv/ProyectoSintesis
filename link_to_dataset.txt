@@ -1,0 +1,10 @@
+Download:
+
+Version 1: Review Data (6.7mb)
+
+Version 1: User and Item Data (71mb)
+
+
+
+https://cseweb.ucsd.edu/~jmcauley/datasets.html#steam_data
+

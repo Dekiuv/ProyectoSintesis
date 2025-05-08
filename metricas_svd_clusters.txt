@@ -1,0 +1,5 @@
+Cluster 0: 1229605 interacciones | MAE: 0.0075 | RMSE: 0.0213 | Precision@10: 1.0000 | Recall@10: 0.7472
+Cluster 1: 752689 interacciones | MAE: 0.0111 | RMSE: 0.0281 | Precision@10: 1.0000 | Recall@10: 0.9777
+Cluster 2: 1187548 interacciones | MAE: 0.0062 | RMSE: 0.0148 | Precision@10: 1.0000 | Recall@10: 0.1597
+Cluster 3: 1696168 interacciones | MAE: 0.0063 | RMSE: 0.0185 | Precision@10: 1.0000 | Recall@10: 0.4701
+Cluster 4: 228072 interacciones | MAE: 0.0011 | RMSE: 0.0023 | Precision@10: 1.0000 | Recall@10: 0.0285
