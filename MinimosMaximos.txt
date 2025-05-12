@@ -1,10 +1,10 @@
 Mínimos
 
 - Segmentación de usuarios basados en compras
-	Cluster 0 - 
-	Cluster 1 - 
-	Cluster 2 - 
-	Cluster 3 - 
+	Cluster 0 - Juegos hardcore multigenero y online (Explorador Online)
+	Cluster 1 - Free to play y shooters competitivos (Competitivo free to play)
+	Cluster 2 - Clasicos de campaña y narrativa (Single player Retro-Narativo)
+	Cluster 3 - Juegadores premium generalistas (Campañas AAA y mundo abierto)
 - Sistema de recomendación básico basado en clusters
 - Chatbot que responda preguntas al usuario, sugiriendo preguntas relevantes
 - Implementar Market Basket Anlyisis
@@ -12,6 +12,6 @@ Mínimos
 Máximos
 
 - Sistema de recomendación basado en la época del año (black friday, navidad, etc).
-- Análisis de sentimiento, basado en la descripción de la reseña, valorar si es positiva, negativa o neutral.
+- Análisis de sentimiento, basado en la descripción de la reseña, valorar si es positiva o negativa.
 - Visualización usuarios reales recomendando por su biblioteca de steam
 - Hacer chatbot tipo chatgpt, responda la pregunta que le haces directamente
