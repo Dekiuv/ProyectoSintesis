@@ -2,7 +2,7 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 
 # Cargar dataset (ajusta si tu archivo se llama distinto)
-df = pd.read_csv("juegos.csv")
+df = pd.read_csv("data\juegos.csv")
 df = df.dropna(subset=['item_name'])
 
 # Cargar modelo preentrenado

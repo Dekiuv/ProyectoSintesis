@@ -2,7 +2,7 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer, util
 
 # Cargar dataset con separador ;
-chatbot_df = pd.read_csv("ChatbotSteam.csv", sep=';').dropna()
+chatbot_df = pd.read_csv("data\ChatbotSteam.csv", sep=';').dropna()
 
 # Cargar modelo
 modelo = SentenceTransformer("all-MiniLM-L6-v2")

@@ -2,7 +2,7 @@ import pandas as pd
 from transformers import pipeline
 
 # Cargar dataset
-df = pd.read_csv("australian_user_reviews.csv")
+df = pd.read_csv("data\User_reviews.csv")
 
 # Eliminar nulos en la columna de texto
 df = df.dropna(subset=['review_text'])
