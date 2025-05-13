@@ -7,28 +7,25 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body>
 
-  <header class="navbar">
-    <div class="logo">
-      <img src="logo.png" alt="Logo">
-    </div>
-    <nav class="menu">
-      <a href="#">Tienda</a>
-      <a href="#">Biblioteca</a>
-      <a href="#">Soporte</a>
-      <a href="#">Carrito</a>
-    </nav>
-    <div class="usuario" onclick="toggleDropdown()">
-        <i class="fa-solid fa-user"></i>
-        <div id="dropdownMenu" class="dropdown hidden">
-            <button onclick="abrirAmigos(event)">Amigos</button>
-            <button onclick="cerrarSesion(event)">Cerrar sesión</button>
-        </div>
-    </div>
-
-  </header>
-
+<header class="navbar">
+  <div class="logo">
+    <img src="logo.png" alt="Logo">
+  </div>
+  <nav class="menu">
+    <a href="#">Tienda</a>
+    <a href="#">Biblioteca</a>
+    <a href="#">Soporte</a>
+    <a href="#">Carrito</a>
+  </nav>
+  <div class="usuario" onclick="toggleDropdown()">
+      <i class="fa-solid fa-user"></i>
+      <div id="dropdownMenu" class="dropdown hidden">
+          <button onclick="abrirAmigos(event)">Amigos</button>
+          <button onclick="cerrarSesion(event)">Cerrar sesión</button>
+      </div>
+  </div>
+</header>
   <script>
   function toggleDropdown() {
     const menu = document.getElementById("dropdownMenu");
@@ -54,6 +51,12 @@
     }
   });
 </script>
-
+<body>
 </body>
+<footer class="footer">
+  <div class="footer-content">
+    <p>&copy; 2025 Steam - Todos los derechos reservados</p>
+  </div>
+</footer>
+
 </html>
