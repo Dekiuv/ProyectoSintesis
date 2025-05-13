@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Soporte Steam</title>
+  <link rel="stylesheet" href="/static/soporte.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo"><img src="/static/logo.png" alt="Logo" /></div>
+    <nav class="menu">
+      <a href="#">Tienda</a><a href="#">Biblioteca</a><a href="#">Soporte</a><a href="#">Carrito</a>
+    </nav>
+    <div class="usuario" onclick="toggleDropdown()">
+      <i class="fa-solid fa-user"></i>
+      <div id="dropdownMenu" class="dropdown hidden">
+        <button onclick="abrirAmigos(event)">Amigos</button>
+        <button onclick="cerrarSesion(event)">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="titulo-soporte">Soporte</h1>
+
+    <div class="buscador">
+      <div class="input-group">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="pregunta" placeholder="Escribe tu pregunta..." />
+        <button onclick="enviarPregunta()">Buscar</button>
+      </div>
+    </div>
+
+    <div id="resultado" class="respuesta"></div>
+
+    <h3>Temas populares:</h3>
+    <div class="temas-populares">
+      {% for tema in preguntas %}
+        <button onclick="buscarTema('{{ tema }}')">{{ tema }}</button>
+      {% endfor %}
+    </div>
+
+    <div id="sugerencias-dinamicas-container">
+      <h3 id="titulo-sugerencias" class="centrado"></h3>
+      <div id="sugerencias-dinamicas" class="preguntas-sugeridas"></div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p>&copy; 2025 Steam - Todos los derechos reservados</p>
+    </div>
+  </footer>
+
+  <script>
+    function toggleDropdown() {
+      document.getElementById("dropdownMenu").classList.toggle("hidden");
+    }
+
+    function abrirAmigos(event) {
+      event.stopPropagation();
+      alert("👥 Abriendo lista de amigos...");
+    }
+
+    function cerrarSesion(event) {
+      event.stopPropagation();
+      alert("🔒 Cerrando sesión...");
+    }
+
+    document.addEventListener("click", function (e) {
+      const usuario = document.querySelector(".usuario");
+      const dropdown = document.getElementById("dropdownMenu");
+      if (!usuario.contains(e.target)) dropdown.classList.add("hidden");
+    });
+
+    async function enviarPregunta() {
+      const pregunta = document.getElementById("pregunta").value;
+      const res = await fetch("/preguntar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pregunta })
+      });
+
+      const data = await res.json();
+      const contenedor = document.getElementById("sugerencias-dinamicas");
+      contenedor.innerHTML = "<h3> </h3>";
+
+      data.sugerencias.forEach(p => {
+        const btn = document.createElement("button");
+        btn.textContent = p;
+        btn.classList.add("sugerencia-btn");
+        btn.onclick = async () => {
+          document.getElementById("pregunta").value = p;
+          const res2 = await fetch("/respuesta", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pregunta: p })
+          });
+          const data2 = await res2.json();
+          document.getElementById("resultado").innerHTML = `<p><strong>Respuesta:</strong> ${data2.respuesta}</p>`;
+        };
+        contenedor.appendChild(btn);
+      });
+
+      document.getElementById("resultado").innerHTML = "";
+    }
+
+    async function buscarTema(tema) {
+      document.getElementById("pregunta").value = tema;
+
+      const res = await fetch("/sugerencias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pregunta: tema })
+      });
+
+      const data = await res.json();
+      const contenedor = document.getElementById("sugerencias-dinamicas");
+      document.getElementById("titulo-sugerencias").textContent = "¿Quizás quisiste decir...?"; 
+      contenedor.innerHTML = "";  // Limpia sugerencias anteriores
+
+
+      data.sugerencias.forEach(p => {
+        const btn = document.createElement("button");
+        btn.textContent = p;
+        btn.classList.add("sugerencia-btn");
+        btn.onclick = async () => {
+          document.getElementById("pregunta").value = p;
+          const res2 = await fetch("/respuesta", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pregunta: p })
+          });
+          const data2 = await res2.json();
+          document.getElementById("resultado").innerHTML = `<p><strong>Respuesta:</strong> ${data2.respuesta}</p>`;
+        };
+        contenedor.appendChild(btn);
+      });
+
+      document.getElementById("resultado").innerHTML = "";
+    }
+  </script>
+</body>
+</html>
