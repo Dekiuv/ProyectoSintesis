@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recomendador de Juegos Steam</title>
+    <style>
+        body { font-family: sans-serif; padding: 2rem; }
+        .card { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; border-radius: 10px; display: flex; gap: 1rem; }
+        img { width: 200px; border-radius: 8px; }
+        .reco { margin-top: 2rem; }
+        input { padding: 0.5rem; width: 300px; }
+        button { padding: 0.5rem 1rem; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Recomendador de Juegos de Steam</h1>
+    <p>Introduce tu URL de perfil de Steam o tu Steam ID:</p>
+    <input id="steam_input" placeholder="Ej. https://steamcommunity.com/id/usuario123">
+    <button onclick="obtenerRecomendaciones()">Recomendar</button>
+
+    <div id="recomendaciones" class="reco"></div>
+
+    <script>
+        async function obtenerRecomendaciones() {
+            const entrada = document.getElementById("steam_input").value.trim();
+            if (!entrada) return alert("Introduce un perfil de Steam válido.");
+
+            let steam_id = entrada;
+            // Extrae el vanity o steamid si es URL
+            if (entrada.includes("/")) {
+                steam_id = entrada.split("/").filter(Boolean).pop();
+            }
+
+            const resp = await fetch(`/recomendar/${steam_id}`);
+            const data = await resp.json();
+
+            const cont = document.getElementById("recomendaciones");
+            cont.innerHTML = "";
+
+            if (data.recomendaciones) {
+                data.recomendaciones.forEach(juego => {
+                    cont.innerHTML += `
+                        <div class="card">
+                            <img src="${juego.imagen}" alt="imagen">
+                            <div>
+                                <h2>${juego.nombre}</h2>
+                                <p><strong>Score:</strong> ${juego.score}</p>
+                                <p>${juego.descripcion}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                cont.innerHTML = "<p>⚠️ No se pudieron obtener recomendaciones.</p>";
+            }
+        }
+    </script>
+</body>
+</html>
