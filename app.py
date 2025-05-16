@@ -166,8 +166,17 @@ async def obtener_amigos(request: Request):
 # Página soporte
 @app.get("/soporte", response_class=HTMLResponse)
 async def soporte(request: Request):
+    if not request.session.get("steam_id"):
+        return RedirectResponse("/", status_code=302)
+
     temas = ["Steam", "Juegos", "Amigos", "Perfil", "Devolución"]
-    return templates.TemplateResponse("soporte.html", {"request": request, "preguntas": temas})
+    return templates.TemplateResponse("soporte.html", {
+        "request": request,
+        "preguntas": temas,
+        "avatar": request.session.get("avatar"),
+        "nombre": request.session.get("nombre")
+    })
+
 
 # Chatbot
 @app.post("/preguntar")

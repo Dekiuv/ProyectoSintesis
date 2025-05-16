@@ -58,8 +58,6 @@ body {
   white-space: nowrap;
 }
 
-
-
 .dropdown {
   display: none;
   position: absolute;
@@ -115,8 +113,6 @@ main {
   object-fit: cover;
   border: 2px solid #66c0f4;
 }
-
-
 
 .panel-amigos {
   position: fixed;

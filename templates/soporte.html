@@ -17,14 +17,24 @@
       <a href="#">Carrito</a>
     </nav>
     <div class="usuario" onclick="toggleDropdown()">
-      <i class="fa-solid fa-user"></i>
+      <span class="nombre-usuario">{{ nombre }}</span>
+      <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
+
       <div id="dropdownMenu" class="dropdown hidden">
         <button onclick="abrirAmigos(event)">Amigos</button>
-        <button onclick="cerrarSesion(event)">Cerrar sesión</button>
+        <button onclick="window.location.href='/logout'">Cerrar sesión</button>
       </div>
     </div>
   </header>
-
+  <!-- PANEL DE AMIGOS (popup lateral derecho) -->
+  <div id="panel-amigos" class="panel-amigos hidden">
+    <div class="panel-header">
+      <h3>Amigos</h3>
+      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
+    </div>
+    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
+    <div id="lista-amigos"></div>
+  </div>
   <main>
     <h1 class="titulo-soporte">Soporte</h1>
 
@@ -59,19 +69,17 @@
   </footer>
 
   <script>
+    // Dropdown del usuario
     function toggleDropdown() {
       document.getElementById("dropdownMenu").classList.toggle("hidden");
     }
 
-    function abrirAmigos(event) {
-      event.stopPropagation();
-      alert("👥 Abriendo lista de amigos...");
-    }
-
-    function cerrarSesion(event) {
-      event.stopPropagation();
-      alert("🔒 Cerrando sesión...");
-    }
+    // Cerrar el dropdown al hacer clic fuera
+    document.addEventListener("click", function (e) {
+      if (!document.querySelector(".usuario").contains(e.target)) {
+        document.getElementById("dropdownMenu").classList.add("hidden");
+      }
+    });
 
     document.addEventListener("click", function (e) {
       const usuario = document.querySelector(".usuario");
@@ -79,6 +87,47 @@
       if (!usuario.contains(e.target)) dropdown.classList.add("hidden");
     });
 
+    // Panel de amigos
+    async function abrirAmigos(event) {
+    document.body.classList.add("no-scroll");
+    event.stopPropagation();
+    const panel = document.getElementById("panel-amigos");
+    panel.classList.remove("hidden");
+
+    const res = await fetch("/amigos");
+    const amigos = await res.json();
+
+    const lista = document.getElementById("lista-amigos");
+    lista.innerHTML = "";
+
+    amigos.forEach(amigo => {
+      const div = document.createElement("div");
+      div.className = "amigo-item";
+      div.innerHTML = `
+        <img src="${amigo.avatar}" class="amigo-avatar" alt="avatar">
+        <span class="amigo-nombre">${amigo.nombre}</span>
+      `;
+      lista.appendChild(div);
+      });
+    }
+
+    function cerrarPanelAmigos() {
+      document.body.classList.remove("no-scroll");
+      document.getElementById("panel-amigos").classList.add("hidden");
+    }
+
+    // Buscador de amigos
+    document.getElementById("buscador-amigos").addEventListener("input", function () {
+      const filtro = this.value.toLowerCase();
+      const amigos = document.querySelectorAll(".amigo-item");
+
+      amigos.forEach(amigo => {
+        const nombre = amigo.textContent.toLowerCase();
+        amigo.style.display = nombre.includes(filtro) ? "flex" : "none";
+      });
+    });
+
+    // Funciones para manejar la búsqueda de preguntas y sugerencias
     async function enviarPregunta() {
       const pregunta = document.getElementById("pregunta").value;
       const res = await fetch("/preguntar", {
