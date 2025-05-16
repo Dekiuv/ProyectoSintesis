@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Steamia | Biblioteca</title>
+  <link rel="stylesheet" href="/static/biblioteca.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
+    <nav class="menu">
+      <a href="#">Tienda</a>
+      <a href="#">Biblioteca</a>
+      <a href="#">Soporte</a>
+      <a href="#">Carrito</a>
+    </nav>
+    <div class="usuario" onclick="toggleDropdown()">
+      <span class="nombre-usuario">{{ nombre }}</span>
+      <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
+
+      <div id="dropdownMenu" class="dropdown hidden">
+        <button onclick="abrirAmigos(event)">Amigos</button>
+        <button onclick="window.location.href='/logout'">Cerrar sesión</button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- PANEL DE AMIGOS (popup lateral derecho) -->
+  <div id="panel-amigos" class="panel-amigos hidden">
+    <div class="panel-header">
+      <h3>Amigos</h3>
+      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
+    </div>
+    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
+    <div id="lista-amigos"></div>
+  </div>
+
+  <main>
+    <h1>Mi Biblioteca</h1>
+    <div class="buscador">
+      <input type="text" id="busqueda" placeholder="Buscar juego por nombre...">
+    </div>
+
+    <div id="loader" class="loader-box">
+      <div class="loader-spinner"></div>
+      <p>Cargando biblioteca...</p>
+    </div>
+
+    <div id="juegos-container"></div>
+
+    <!-- Modal -->
+    <div id="juego-modal" class="modal hidden">
+      <div class="modal-contenido">
+        <span class="cerrar" onclick="cerrarModal()">&times;</span>
+        <img id="modal-imagen" src="" alt="Imagen del juego">
+        <h2 id="modal-nombre"></h2>
+        <p id="modal-categorias"></p>
+        <p id="modal-descripcion"></p>
+        <a id="modal-link" href="#" target="_blank" class="ver-mas-btn">Ver en Steam</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+  </footer>
+
+<script>
+  // Dropdown del usuario
+  function toggleDropdown() {
+    document.getElementById("dropdownMenu").classList.toggle("hidden");
+  }
+
+  // Cerrar el dropdown al hacer clic fuera
+  document.addEventListener("click", function (e) {
+    if (!document.querySelector(".usuario").contains(e.target)) {
+      document.getElementById("dropdownMenu").classList.add("hidden");
+    }
+  });
+
+  // Cargar juegos al iniciar
+  async function cargarJuegos() {
+    const loader = document.getElementById("loader");
+    loader.style.display = "block";
+    const contenedor = document.getElementById("juegos-container");
+
+    try {
+      const res = await fetch("/juegos");
+      const juegos = await res.json();
+      contenedor.innerHTML = "";
+      juegos.forEach(juego => {
+        const card = document.createElement("div");
+        card.className = "juego-card";
+        card.innerHTML = `<img src="${juego.imagen}" alt="${juego.nombre}"><h3>${juego.nombre}</h3>`;
+        card.onclick = () => abrirModal(juego);
+        contenedor.appendChild(card);
+      });
+    } catch (e) {
+      contenedor.innerHTML = "<p style='color:white'>No se pudo cargar la biblioteca.</p>";
+    } finally {
+      loader.style.display = "none";
+    }
+  }
+
+  function abrirModal(juego) {
+    document.getElementById("modal-imagen").src = juego.imagen;
+    document.getElementById("modal-nombre").textContent = juego.nombre;
+    document.getElementById("modal-descripcion").textContent = juego.descripcion;
+    document.getElementById("modal-categorias").textContent = juego.categorias?.join(", ") || "Sin categorías";
+    document.getElementById("modal-link").href = `https://store.steampowered.com/app/${juego.appid}`;
+    document.getElementById("juego-modal").classList.remove("hidden");
+    document.getElementById("juego-modal").style.display = "flex";
+  }
+
+  function cerrarModal() {
+    const modal = document.getElementById("juego-modal");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+  }
+
+  // Buscar mientras se escribe
+  document.getElementById("busqueda").addEventListener("input", async function () {
+    const query = this.value.trim();
+    const contenedor = document.getElementById("juegos-container");
+
+    if (query === "") {
+      await cargarJuegos();
+      return;
+    }
+
+    const res = await fetch(`/buscar?q=${encodeURIComponent(query)}`);
+    const juegos = await res.json();
+    contenedor.innerHTML = "";
+
+    if (juegos.length === 0) {
+      contenedor.innerHTML = `<p style="color:white">No se encontró ningún juego para: <strong>${query}</strong></p>`;
+      return;
+    }
+
+    juegos.forEach(juego => {
+      const card = document.createElement("div");
+      card.className = "juego-card";
+      card.innerHTML = `<img src="${juego.imagen}" alt="${juego.nombre}"><h3>${juego.nombre}</h3>`;
+      card.onclick = () => abrirModal(juego);
+      contenedor.appendChild(card);
+    });
+  });
+
+  window.onload = cargarJuegos;
+  
+  // PANEL DE AMIGOS
+  async function abrirAmigos(event) {
+    document.body.classList.add("no-scroll");
+    event.stopPropagation();
+    const panel = document.getElementById("panel-amigos");
+    panel.classList.remove("hidden");
+
+    const res = await fetch("/amigos");
+    const amigos = await res.json();
+
+    const lista = document.getElementById("lista-amigos");
+    lista.innerHTML = "";
+
+    amigos.forEach(amigo => {
+      const div = document.createElement("div");
+      div.className = "amigo-item";
+      div.innerHTML = `
+        <img src="${amigo.avatar}" class="amigo-avatar" alt="avatar">
+        <span class="amigo-nombre">${amigo.nombre}</span>
+      `;
+      lista.appendChild(div);
+    });
+  }
+
+  function cerrarPanelAmigos() {
+    document.body.classList.remove("no-scroll");
+    document.getElementById("panel-amigos").classList.add("hidden");
+  }
+
+  // Buscador de amigos
+  document.getElementById("buscador-amigos").addEventListener("input", function () {
+    const filtro = this.value.toLowerCase();
+    const amigos = document.querySelectorAll(".amigo-item");
+
+    amigos.forEach(amigo => {
+      const nombre = amigo.textContent.toLowerCase();
+      amigo.style.display = nombre.includes(filtro) ? "flex" : "none";
+    });
+  });
+
+</script>
+</body>
+</html>

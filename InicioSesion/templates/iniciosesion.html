@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Steam</title>
+  <link rel="stylesheet" href="/static/iniciosesion.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="logo">
+      <img src="/static/logo.png" alt="Logo" />
+    </div>
+    <nav class="menu">
+      <a href="#">Tienda</a>
+      <a href="#">Biblioteca</a>
+      <a href="#">Soporte</a>
+      <a href="#">Carrito</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="login-container">
+      <h2>¡Bienvenido a SteamIA!</h2>
+      <p>Introduce tu Steam ID para acceder a tu biblioteca.</p>
+      {% if error %}
+        <p style="color: red; font-weight: bold;">{{ error }}</p>
+      {% endif %}
+
+
+
+      <form action="/login" method="post">
+        <input type="text" id="steam_id" name="steam_id" placeholder="Ejemplo: 76561198373413082" required minlength="17" maxlength="17" pattern="\d{17}" title="Introduce exactamente 17 dígitos numéricos"/>
+        <div class="login-abajo">
+          <!-- Botón para mostrar el popup -->
+          <button type="button" class="ayuda-steamid-btn" onclick="abrirPopup()">¿Dónde encuentro mi Steam ID?</button>
+
+          <!-- Popup oculto -->
+          <div id="popup-ayuda" class="popup hidden">
+            <div class="popup-contenido">
+              <span class="cerrar-popup" onclick="cerrarPopup()">&times;</span>
+              <h3>¿Dónde encuentro mi Steam ID?</h3>
+              <p>1. Abre Steam en un navegador y ve a tu perfil.<br>
+                2. Copia el número de 17 digitos que aparece en la url del navegador.</br>
+                <img src="/static/Ayuda1.png" alt="Ejemplo perfil de Steam" class="imagen-ayuda"></p>
+            </div>
+          </div>
+          <button type="submit">Iniciar sesión</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+<script>
+  function abrirPopup() {
+    document.getElementById("popup-ayuda").classList.remove("hidden");
+  }
+
+  function cerrarPopup() {
+    document.getElementById("popup-ayuda").classList.add("hidden");
+  }
+</script>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p>&copy; 2025 Steam - Todos los derechos reservados</p>
+    </div>
+  </footer>
+</body>
+</html>
