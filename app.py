@@ -9,6 +9,8 @@ import os
 import requests
 import pandas as pd
 import random
+from gensim.models import Word2Vec
+import json
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="clave_secreta")
@@ -23,7 +25,14 @@ STEAM_KEYS = [
     ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
     ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
+    ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
 ]
+
+# === Cargar modelo de recomendación ===
+modelo = Word2Vec.load("modelo_word2vec_mejorado.model")
+df_meta = pd.read_csv("steam_juegos_metadata.csv").fillna("")
+df_meta["appid"] = df_meta["appid"].astype(str)
+metadata_dict = df_meta.set_index("appid").to_dict(orient="index")
 
 modelo_nlp = SentenceTransformer("all-MiniLM-L6-v2")
 juegos_cache = []
@@ -84,7 +93,7 @@ async def login(request: Request, steam_id: str = Form(...)):
     request.session["avatar"] = avatar
     request.session["nombre"] = nombre
 
-    return RedirectResponse("/biblioteca", status_code=302)
+    return RedirectResponse("/tienda", status_code=302)
 
 @app.get("/logout")
 async def logout(request: Request):
@@ -221,3 +230,66 @@ async def sugerencias(data: dict):
     top5 = top_indices[:5]
     sugerencias = [chatbot_df.iloc[i]["Question"] for i in top5]
     return JSONResponse({"sugerencias": sugerencias})
+
+def obtener_juegos_usuario_con_tiempo(steam_id):
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
+        {"steamid": steam_id, "include_appinfo": "true"}
+    )
+    juegos = datos.get("response", {}).get("games", []) if datos else []
+    return {str(j["appid"]): j.get("playtime_forever", 0) for j in juegos if j.get("playtime_forever", 0) > 0}
+
+def recomendar_desde_juegos(juegos_dict, topn=20, alpha=0.7):
+    similares = {}
+    for item_id, playtime in juegos_dict.items():
+        if item_id in modelo.wv:
+            peso = min(playtime / 60, 10)
+            try:
+                similares_raw = modelo.wv.most_similar(item_id, topn=50)
+            except KeyError:
+                continue
+
+            for similar_id, score in similares_raw:
+                if similar_id not in metadata_dict or similar_id in juegos_dict:
+                    continue
+
+                metacritic = metadata_dict[similar_id].get("metacritic_score", 0)
+                try:
+                    metacritic = float(metacritic) / 100 if metacritic else 0
+                except:
+                    metacritic = 0
+
+                score_final = peso * (alpha * score + (1 - alpha) * metacritic)
+                similares[similar_id] = similares.get(similar_id, 0) + score_final
+
+    recomendaciones = sorted(similares.items(), key=lambda x: x[1], reverse=True)[:topn]
+    resultado = []
+    for item_id, score in recomendaciones:
+        meta = metadata_dict[item_id]
+        resultado.append({
+            "item_id": item_id,
+            "nombre": meta["name"],
+            "score": round(score, 4),
+            "metacritic": meta.get("metacritic_score"),
+            "imagen": meta.get("header_image"),
+            "descripcion": meta.get("short_description")
+        })
+    return resultado
+
+# === Página de tienda ===
+@app.get("/tienda", response_class=HTMLResponse)
+async def mostrar_tienda(request: Request):
+    steam_id = request.session.get("steam_id")
+    if not steam_id:
+        return RedirectResponse("/", status_code=302)
+
+    juegos_dict = obtener_juegos_usuario_con_tiempo(steam_id)
+    juegos_validos = {j: p for j, p in juegos_dict.items() if j in modelo.wv}
+    recomendaciones = recomendar_desde_juegos(juegos_validos, 50, 0.8)
+
+    return templates.TemplateResponse("tienda.html", {
+        "request": request,
+        "avatar": request.session.get("avatar"),
+        "nombre": request.session.get("nombre"),
+        "recomendaciones": recomendaciones
+    })
