@@ -3,3 +3,5 @@ venv/
 *.json
 *.pkl
 __pycache__
+.env
+.model

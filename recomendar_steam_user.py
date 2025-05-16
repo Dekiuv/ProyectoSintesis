@@ -8,7 +8,8 @@ import joblib
 # Configuración
 API_KEYS = [
     "F5E52AD27E9DC7006A2068AA05B6EE04",
-    "F8A4003EBB12D2357E82A7D7ED29F694"
+    "F8A4003EBB12D2357E82A7D7ED29F694",
+    "2229DCFC63F3222C4D44D7759A3D655B", #Aritz
 ]
 URL_API = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
 RUTA_MODELO = "modelo_lightfm.pkl"
