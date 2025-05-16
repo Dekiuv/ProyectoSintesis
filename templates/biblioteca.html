@@ -10,7 +10,7 @@
   <header class="navbar">
     <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
     <nav class="menu">
-      <a href="#">Tienda</a>
+      <a href="/tienda">Tienda</a>
       <a href="/biblioteca">Biblioteca</a>
       <a href="/soporte">Soporte</a>
       <a href="#">Carrito</a>
@@ -64,19 +64,9 @@
   <footer class="footer">
     <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
   </footer>
-
+<script src="static/header.js"></script>
 <script>
-  // Dropdown del usuario
-  function toggleDropdown() {
-    document.getElementById("dropdownMenu").classList.toggle("hidden");
-  }
 
-  // Cerrar el dropdown al hacer clic fuera
-  document.addEventListener("click", function (e) {
-    if (!document.querySelector(".usuario").contains(e.target)) {
-      document.getElementById("dropdownMenu").classList.add("hidden");
-    }
-  });
 
   // Cargar juegos al iniciar
   async function cargarJuegos() {
@@ -148,45 +138,7 @@
 
   window.onload = cargarJuegos;
   
-  // PANEL DE AMIGOS
-  async function abrirAmigos(event) {
-    document.body.classList.add("no-scroll");
-    event.stopPropagation();
-    const panel = document.getElementById("panel-amigos");
-    panel.classList.remove("hidden");
-
-    const res = await fetch("/amigos");
-    const amigos = await res.json();
-
-    const lista = document.getElementById("lista-amigos");
-    lista.innerHTML = "";
-
-    amigos.forEach(amigo => {
-      const div = document.createElement("div");
-      div.className = "amigo-item";
-      div.innerHTML = `
-        <img src="${amigo.avatar}" class="amigo-avatar" alt="avatar">
-        <span class="amigo-nombre">${amigo.nombre}</span>
-      `;
-      lista.appendChild(div);
-    });
-  }
-
-  function cerrarPanelAmigos() {
-    document.body.classList.remove("no-scroll");
-    document.getElementById("panel-amigos").classList.add("hidden");
-  }
-
-  // Buscador de amigos
-  document.getElementById("buscador-amigos").addEventListener("input", function () {
-    const filtro = this.value.toLowerCase();
-    const amigos = document.querySelectorAll(".amigo-item");
-
-    amigos.forEach(amigo => {
-      const nombre = amigo.textContent.toLowerCase();
-      amigo.style.display = nombre.includes(filtro) ? "flex" : "none";
-    });
-  });
+  
 
 </script>
 </body>

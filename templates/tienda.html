@@ -4,15 +4,36 @@
     <meta charset="UTF-8">
     <title>Recomendaciones para {{ nombre }}</title>
     <link rel="stylesheet" href="/static/tienda.css">
+    <link rel="stylesheet" href="/static/header.css">
 </head>
 <body>
-    <header>
-        <div class="usuario-info">
-            <img src="{{ avatar }}" alt="Avatar" style="width: 64px; border-radius: 50%;">
-            <h2>Hola, {{ nombre }}</h2>
+    <header class="navbar">
+        <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
+        <nav class="menu">
+          <a href="/tienda">Tienda</a>
+          <a href="/biblioteca">Biblioteca</a>
+          <a href="/soporte">Soporte</a>
+          <a href="#">Carrito</a>
+        </nav>
+        <div class="usuario" onclick="toggleDropdown()">
+          <span class="nombre-usuario">{{ nombre }}</span>
+          <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
+    
+          <div id="dropdownMenu" class="dropdown hidden">
+            <button onclick="abrirAmigos(event)">Amigos</button>
+            <button onclick="window.location.href='/logout'">Cerrar sesión</button>
+          </div>
         </div>
-    </header>
-
+      </header>
+ <!-- PANEL DE AMIGOS (popup lateral derecho) -->
+ <div id="panel-amigos" class="panel-amigos hidden">
+    <div class="panel-header">
+      <h3>Amigos</h3>
+      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
+    </div>
+    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
+    <div id="lista-amigos"></div>
+  </div>
     <main>
         <h1>🎮 Recomendaciones para ti</h1>
 
@@ -36,5 +57,6 @@
             <p>❌ No se encontraron recomendaciones.</p>
         {% endif %}
     </main>
+    <script src="static/header.js"></script>
 </body>
 </html>
