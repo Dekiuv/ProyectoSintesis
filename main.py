@@ -110,7 +110,7 @@ def recomendar_desde_juegos(juegos_dict, topn=20, alpha=0.7):
 # === Página principal HTML ===
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("iniciosesion.html", {"request": request})
 
 @app.get("/recomendar/{usuario_input}")
 def recomendar(usuario_input: str):

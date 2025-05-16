@@ -4,6 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sentence_transformers import SentenceTransformer, util
 from starlette.middleware.sessions import SessionMiddleware
+from dotenv import load_dotenv
+import os
 import requests
 import pandas as pd
 import random
@@ -14,13 +16,34 @@ app.add_middleware(SessionMiddleware, secret_key="clave_secreta")
 # Inicio aplicación
 app.mount("/static", StaticFiles(directory="static"), name="biblioteca")
 templates = Jinja2Templates(directory="templates")
-API_KEY = "F5E52AD27E9DC7006A2068AA05B6EE04"
+
+load_dotenv()
+STEAM_KEYS = [
+    ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
+    ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
+    ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
+    ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
+]
+
 modelo_nlp = SentenceTransformer("all-MiniLM-L6-v2")
 juegos_cache = []
 
 # Cargar CSV y modelo
 chatbot_df = pd.read_csv("data/ChatbotSteam.csv", sep=';').dropna()
 preguntas_codificadas = modelo_nlp.encode(chatbot_df['Question'].tolist(), convert_to_tensor=True)
+
+def llamar_api_steam(url, params, timeout=5):
+    for nombre, key in STEAM_KEYS:
+        try:
+            full_params = params.copy()
+            full_params["key"] = key
+            res = requests.get(url, params=full_params, timeout=timeout)
+            res.raise_for_status()
+            print(f"✅ Usando API Key de {nombre}")
+            return res.json()
+        except Exception as e:
+            print(f"⚠️ Error con la clave de {nombre}: {e}")
+    return None
 
 # Página de login
 @app.get("/", response_class=HTMLResponse)
@@ -29,23 +52,31 @@ async def login_form(request: Request):
 
 @app.post("/login")
 async def login(request: Request, steam_id: str = Form(...)):
-    # Verifica si el usuario existe
-    url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key={API_KEY}&steamid={steam_id}&include_appinfo=true"
-    res = requests.get(url)
-    datos = res.json()
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
+        {"steamid": steam_id, "include_appinfo": "true"}
+    )
 
-    if not datos.get("response") or datos["response"].get("game_count", 0) == 0:
+    if not datos or not datos.get("response") or datos["response"].get("game_count", 0) == 0:
         return templates.TemplateResponse(
             "iniciosesion.html",
             {"request": request, "error": "❌ Steam ID no válido o sin juegos."},
             status_code=400
         )
 
-    # Obtener nombre y avatar del usuario
-    perfil_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={API_KEY}&steamids={steam_id}"
-    perfil_res = requests.get(perfil_url).json()
+    perfil_res = llamar_api_steam(
+        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/",
+        {"steamids": steam_id}
+    )
+
+    if not perfil_res or not perfil_res.get("response", {}).get("players"):
+        return templates.TemplateResponse(
+            "iniciosesion.html",
+            {"request": request, "error": "❌ No se pudo obtener el perfil."},
+            status_code=400
+        )
+
     jugador = perfil_res["response"]["players"][0]
-    
     avatar = jugador.get("avatarfull", "")
     nombre = jugador.get("personaname", "Usuario")
 
@@ -55,14 +86,11 @@ async def login(request: Request, steam_id: str = Form(...)):
 
     return RedirectResponse("/biblioteca", status_code=302)
 
-
-
 @app.get("/logout")
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/", status_code=302)
 
-# Página biblioteca
 @app.get("/biblioteca", response_class=HTMLResponse)
 async def mostrar_biblioteca(request: Request):
     if not request.session.get("steam_id"):
@@ -74,17 +102,17 @@ async def mostrar_biblioteca(request: Request):
         "nombre": request.session.get("nombre")
     })
 
-
-# Cargar juegos
 @app.get("/juegos")
 async def obtener_juegos(request: Request):
     steam_id = request.session.get("steam_id")
     if not steam_id:
         return JSONResponse(content={"error": "No autorizado"}, status_code=403)
 
-    url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key={API_KEY}&steamid={steam_id}&include_appinfo=true"
-    res = requests.get(url)
-    juegos = res.json().get("response", {}).get("games", [])
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
+        {"steamid": steam_id, "include_appinfo": "true"}
+    )
+    juegos = datos.get("response", {}).get("games", []) if datos else []
 
     juegos_info = []
     for juego in juegos[:100]:
@@ -122,7 +150,6 @@ async def obtener_juegos(request: Request):
     juegos_cache = juegos_info
     return JSONResponse(content=juegos_info)
 
-# Buscador biblioteca juegos
 @app.get("/buscar")
 async def buscar_juego(q: str):
     if not juegos_cache:
@@ -132,30 +159,28 @@ async def buscar_juego(q: str):
     resultados = [j for j in juegos_cache if q in j["nombre"].lower()]
     return JSONResponse(content=resultados)
 
-
-# Página de amigos
 @app.get("/amigos")
 async def obtener_amigos(request: Request):
     steam_id = request.session.get("steam_id")
     if not steam_id:
         return JSONResponse(content=[], status_code=403)
 
-    # Obtener lista de SteamIDs de los amigos
-    amigos_url = f"https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={API_KEY}&steamid={steam_id}&relationship=friend"
-    res = requests.get(amigos_url)
-    amigos_data = res.json().get("friendslist", {}).get("friends", [])
+    amigos_data = llamar_api_steam(
+        "https://api.steampowered.com/ISteamUser/GetFriendList/v1/",
+        {"steamid": steam_id, "relationship": "friend"}
+    )
 
-    if not amigos_data:
+    amigos_lista = amigos_data.get("friendslist", {}).get("friends", []) if amigos_data else []
+    if not amigos_lista:
         return JSONResponse(content=[])
 
-    steam_ids_amigos = [amigo["steamid"] for amigo in amigos_data[:30]]  # límite para no saturar
-    ids_str = ",".join(steam_ids_amigos)
+    ids_str = ",".join([a["steamid"] for a in amigos_lista[:30]])
+    res_info = llamar_api_steam(
+        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/",
+        {"steamids": ids_str}
+    )
 
-    # Obtener información de los amigos
-    info_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={API_KEY}&steamids={ids_str}"
-    res_info = requests.get(info_url)
-    players = res_info.json().get("response", {}).get("players", [])
-
+    players = res_info.get("response", {}).get("players", []) if res_info else []
     amigos_info = [{
         "nombre": jugador.get("personaname", "Desconocido"),
         "avatar": jugador.get("avatarfull", "")
@@ -163,22 +188,11 @@ async def obtener_amigos(request: Request):
 
     return JSONResponse(content=amigos_info)
 
-# Página soporte
 @app.get("/soporte", response_class=HTMLResponse)
 async def soporte(request: Request):
-    if not request.session.get("steam_id"):
-        return RedirectResponse("/", status_code=302)
-
     temas = ["Steam", "Juegos", "Amigos", "Perfil", "Devolución"]
-    return templates.TemplateResponse("soporte.html", {
-        "request": request,
-        "preguntas": temas,
-        "avatar": request.session.get("avatar"),
-        "nombre": request.session.get("nombre")
-    })
+    return templates.TemplateResponse("soporte.html", {"request": request, "preguntas": temas})
 
-
-# Chatbot
 @app.post("/preguntar")
 async def preguntar(data: dict):
     pregunta = data.get("pregunta", "")
@@ -207,4 +221,3 @@ async def sugerencias(data: dict):
     top5 = top_indices[:5]
     sugerencias = [chatbot_df.iloc[i]["Question"] for i in top5]
     return JSONResponse({"sugerencias": sugerencias})
-
