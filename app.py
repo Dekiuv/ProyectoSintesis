@@ -200,7 +200,10 @@ async def obtener_amigos(request: Request):
 @app.get("/soporte", response_class=HTMLResponse)
 async def soporte(request: Request):
     temas = ["Steam", "Juegos", "Amigos", "Perfil", "Devolución"]
-    return templates.TemplateResponse("soporte.html", {"request": request, "preguntas": temas})
+    return templates.TemplateResponse("soporte.html", {"request": request,
+                                                        "preguntas": temas,
+                                                        "avatar":request.session.get("avatar"),
+                                                        "nombre":request.session.get("nombre")})
 
 @app.post("/preguntar")
 async def preguntar(data: dict):
@@ -246,6 +249,7 @@ def recomendar_desde_juegos(juegos_dict, topn=20, alpha=0.7):
             peso = min(playtime / 60, 10)
             try:
                 similares_raw = modelo.wv.most_similar(item_id, topn=50)
+                print(similares_raw)
             except KeyError:
                 continue
 
