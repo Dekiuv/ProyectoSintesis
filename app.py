@@ -5,16 +5,22 @@ from fastapi.templating import Jinja2Templates
 from sentence_transformers import SentenceTransformer, util
 from starlette.middleware.sessions import SessionMiddleware
 import requests
+import pandas as pd
+import random
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="clave_secreta")
 
+# Inicio aplicación
 app.mount("/static", StaticFiles(directory="static"), name="biblioteca")
 templates = Jinja2Templates(directory="templates")
-
 API_KEY = "F5E52AD27E9DC7006A2068AA05B6EE04"
 modelo_nlp = SentenceTransformer("all-MiniLM-L6-v2")
 juegos_cache = []
+
+# Cargar CSV y modelo
+chatbot_df = pd.read_csv("data/ChatbotSteam.csv", sep=';').dropna()
+preguntas_codificadas = modelo_nlp.encode(chatbot_df['Question'].tolist(), convert_to_tensor=True)
 
 # Página de login
 @app.get("/", response_class=HTMLResponse)
@@ -56,7 +62,7 @@ async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/", status_code=302)
 
-# Página principal
+# Página biblioteca
 @app.get("/biblioteca", response_class=HTMLResponse)
 async def mostrar_biblioteca(request: Request):
     if not request.session.get("steam_id"):
@@ -116,7 +122,7 @@ async def obtener_juegos(request: Request):
     juegos_cache = juegos_info
     return JSONResponse(content=juegos_info)
 
-# Buscador exacto
+# Buscador biblioteca juegos
 @app.get("/buscar")
 async def buscar_juego(q: str):
     if not juegos_cache:
@@ -126,6 +132,8 @@ async def buscar_juego(q: str):
     resultados = [j for j in juegos_cache if q in j["nombre"].lower()]
     return JSONResponse(content=resultados)
 
+
+# Página de amigos
 @app.get("/amigos")
 async def obtener_amigos(request: Request):
     steam_id = request.session.get("steam_id")
@@ -154,4 +162,40 @@ async def obtener_amigos(request: Request):
     } for jugador in players]
 
     return JSONResponse(content=amigos_info)
+
+# Página soporte
+@app.get("/soporte", response_class=HTMLResponse)
+async def soporte(request: Request):
+    temas = ["Steam", "Juegos", "Amigos", "Perfil", "Devolución"]
+    return templates.TemplateResponse("soporte.html", {"request": request, "preguntas": temas})
+
+# Chatbot
+@app.post("/preguntar")
+async def preguntar(data: dict):
+    pregunta = data.get("pregunta", "")
+    pregunta_vec = modelo_nlp.encode(pregunta, convert_to_tensor=True)
+    similitudes = util.pytorch_cos_sim(pregunta_vec, preguntas_codificadas)[0]
+    top_indices = similitudes.topk(k=5).indices.tolist()
+    sugerencias = [chatbot_df.iloc[i]["Question"] for i in top_indices]
+    return JSONResponse({"sugerencias": sugerencias})
+
+@app.post("/respuesta")
+async def respuesta(data: dict):
+    pregunta = data.get("pregunta", "")
+    pregunta_vec = modelo_nlp.encode(pregunta, convert_to_tensor=True)
+    similitudes = util.pytorch_cos_sim(pregunta_vec, preguntas_codificadas)[0]
+    idx = similitudes.argmax().item()
+    respuesta = chatbot_df.iloc[idx]["Answer"]
+    return JSONResponse({"respuesta": respuesta})
+
+@app.post("/sugerencias")
+async def sugerencias(data: dict):
+    pregunta = data.get("pregunta", "")
+    pregunta_vec = modelo_nlp.encode(pregunta, convert_to_tensor=True)
+    similitudes = util.pytorch_cos_sim(pregunta_vec, preguntas_codificadas)[0]
+    top_indices = similitudes.topk(k=10).indices.tolist()
+    random.shuffle(top_indices)
+    top5 = top_indices[:5]
+    sugerencias = [chatbot_df.iloc[i]["Question"] for i in top5]
+    return JSONResponse({"sugerencias": sugerencias})
 
