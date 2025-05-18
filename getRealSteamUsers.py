@@ -52,7 +52,7 @@ def obtener_amigos(steam_id):
 # === Función principal ===
 def recolectar_datos_steam(steam_id_inicial, max_usuarios=1000, output_csv="usuarios_steam_detallado.csv", estado_guardado="estado_progreso.json"):
     visitados = set()
-    cola = deque()
+    cola = deque([steam_id_inicial])
     total = 0
 
     # Cargar estado previo si existe
@@ -64,24 +64,8 @@ def recolectar_datos_steam(steam_id_inicial, max_usuarios=1000, output_csv="usua
             total = estado.get("total", 0)
             print(f"🔄 Reanudando desde el estado guardado: {total} usuarios ya procesados.")
 
-    # Si no hay cola pero hay CSV, reanudar desde el último usuario guardado
-    if not cola and os.path.exists(output_csv):
-        with open(output_csv, "r", encoding="utf-8") as f:
-            reader = csv.reader(f)
-            next(reader)  # Saltar encabezado
-            for row in reader:
-                visitados.add(row[0])
-        if visitados:
-            ultimo_id = list(visitados)[-1]
-            cola.append(ultimo_id)
-            print(f"🟡 Reanudando desde el último usuario en CSV: {ultimo_id}")
-        else:
-            cola.append(steam_id_inicial)
-    elif not cola:
-        cola.append(steam_id_inicial)
-
     existe = os.path.isfile(output_csv)
-    with open(output_csv, mode="a", newline="utf-8") as f:
+    with open(output_csv, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not existe:
             writer.writerow(["steam_id", "appid", "name", "playtime_forever", "playtime_2weeks", "img_icon_url", "has_stats", "has_leaderboards", "content_descriptorids"])
