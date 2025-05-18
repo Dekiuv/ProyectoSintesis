@@ -200,7 +200,8 @@ async def obtener_amigos(request: Request):
 @app.get("/soporte", response_class=HTMLResponse)
 async def soporte(request: Request):
     temas = ["Steam", "Juegos", "Amigos", "Perfil", "Devolución"]
-    return templates.TemplateResponse("soporte.html", {"request": request,
+    return templates.TemplateResponse("soporte.html", 
+                                      {"request": request,
                                                         "preguntas": temas,
                                                         "avatar":request.session.get("avatar"),
                                                         "nombre":request.session.get("nombre")})
