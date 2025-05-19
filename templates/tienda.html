@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Recomendaciones para {{ nombre }}</title>
+    <title>Tienda | Steamia</title>
     <link rel="stylesheet" href="/static/tienda.css">
     <link rel="stylesheet" href="/static/header.css">
 </head>
@@ -44,13 +44,10 @@
                         <img src="{{ juego.imagen }}" alt="{{ juego.nombre }}">
                         <div class="info">
                             <h3>{{ juego.nombre }}</h3>
-                            <p><strong>Score:</strong> {{ juego.score }}</p>
-                            <p>{{ juego.descripcion }}</p>
-                            {% if juego.metacritic %}
-                                <p><strong>Metacritic:</strong> {{ juego.metacritic }}</p>
-                            {% endif %}
+                            <a href="/juego/{{ juego.item_id }}" class="comprar-btn">Comprar juego</a>
                         </div>
                     </div>
+
                 {% endfor %}
             </div>
         {% else %}

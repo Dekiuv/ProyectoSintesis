@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ juego.nombre }} | Steamia</title>
+  <link rel="stylesheet" href="/static/juego.css">
+  <link rel="stylesheet" href="/static/detalle_juego.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
+    <nav class="menu">
+      <a href="/tienda">Tienda</a>
+      <a href="/biblioteca">Biblioteca</a>
+      <a href="/soporte">Soporte</a>
+      <a href="#">Carrito</a>
+    </nav>
+    <div class="usuario" onclick="toggleDropdown()">
+      <span class="nombre-usuario">{{ nombre }}</span>
+      <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
+      <div id="dropdownMenu" class="dropdown hidden">
+        <button onclick="abrirAmigos(event)">Amigos</button>
+        <button onclick="window.location.href='/logout'">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="panel-amigos" class="panel-amigos hidden">
+    <div class="panel-header">
+      <h3>Amigos</h3>
+      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
+    </div>
+    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
+    <div id="lista-amigos"></div>
+  </div>
+
+  <main>
+    <section class="juego-detalle">
+      <img src="{{ juego.imagen }}" alt="Imagen del juego">
+      <div class="info">
+        <h1>{{ juego.nombre }}</h1>
+        <p class="descripcion">{{ juego.descripcion }}</p>
+        <p><strong>Categorías:</strong> {{ juego.categorias | join(', ') }}</p>
+        <a href="https://store.steampowered.com/app/{{ juego.appid }}" target="_blank" class="comprar-btn">Comprar ({{ juego.precio }})</a>
+      </div>
+    </section>
+
+    <section class="recomendacion">
+      <h2>🔁 Recomendaciones (MBA)</h2>
+      <!-- Aquí pondrás recomendaciones más adelante -->
+    </section>
+
+    <section class="reviews">
+      <h2>🗨️ Reseñas más relevantes 
+        {% if resumen_sentimiento != "Sin reseñas suficientes" %}
+          <small style="font-weight: normal;">(Los usuarios determinan este juego como <strong>{{ resumen_sentimiento }}</strong>)</small>
+        {% endif %}
+      </h2>
+
+      {% for review in reviews %}
+        <div class="review">
+          <img src="{{ review.avatar }}" alt="avatar">
+          <img src="{{ review.imagen_estrella }}" alt="estrellas" class="estrella-review">
+          <div class="texto">
+            <h4>{{ review.usuario }}</h4>
+            <p>{{ review.texto }}</p>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+  </footer>
+
+  <script src="/static/header.js"></script>
+</body>
+</html>

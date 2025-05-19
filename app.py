@@ -11,6 +11,16 @@ import pandas as pd
 import random
 from gensim.models import Word2Vec
 import json
+import re
+from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+
+# ========== CARGAR MODELO SENTIMIENTO ==========
+print("⏳ Cargando modelo de sentimiento...")
+tokenizer_sent = AutoTokenizer.from_pretrained("modelo_sentimiento")
+model_sent = AutoModelForSequenceClassification.from_pretrained("modelo_sentimiento")
+sentiment_analyzer = pipeline("sentiment-analysis", model=model_sent, tokenizer=tokenizer_sent)
+print("✅ Modelo de sentimiento cargado.")
+
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="clave_secreta")
@@ -53,6 +63,13 @@ def llamar_api_steam(url, params, timeout=5):
         except Exception as e:
             print(f"⚠️ Error con la clave de {nombre}: {e}")
     return None
+
+def limpiar_texto(texto):
+    texto = texto.lower()
+    texto = re.sub(r"http\S+|www.\S+", "", texto)
+    texto = re.sub(r"[^\w\sáéíóúüñçàèìòùâêîôûäëïöü]", "", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return texto
 
 # Página de login
 @app.get("/", response_class=HTMLResponse)
@@ -297,4 +314,85 @@ async def mostrar_tienda(request: Request):
         "avatar": request.session.get("avatar"),
         "nombre": request.session.get("nombre"),
         "recomendaciones": recomendaciones
+    })
+
+@app.get("/juego/{appid}", response_class=HTMLResponse)
+async def detalle_juego(request: Request, appid: int):
+    # Datos del juego
+    url = f"https://store.steampowered.com/api/appdetails?appids={appid}&cc=es&l=spanish"
+    res = requests.get(url)
+    data = res.json()
+    
+    juego_data = data.get(str(appid), {}).get("data", {})
+    if not juego_data:
+        return HTMLResponse("Juego no encontrado", status_code=404)
+
+    juego = {
+        "appid": appid,
+        "nombre": juego_data.get("name"),
+        "descripcion": juego_data.get("short_description", "Sin descripción."),
+        "imagen": juego_data.get("header_image"),
+        "categorias": [c["description"] for c in juego_data.get("categories", [])],
+        "precio": juego_data.get("price_overview", {}).get("final_formatted", "Gratis")
+    }
+
+    # Reviews del juego
+    res_reviews = requests.get(f"https://store.steampowered.com/appreviews/{appid}?json=1&language=spanish&num_per_page=10")
+    reviews_raw = res_reviews.json().get("reviews", [])
+
+    reviews = []
+    for review in reviews_raw:
+        steamid = review["author"]["steamid"]
+        texto = review["review"]
+
+        # Avatar y nombre del usuario
+        perfil = llamar_api_steam(
+            "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/",
+            {"steamids": steamid}
+        )
+
+        jugador = perfil.get("response", {}).get("players", [{}])[0]
+
+        avatar = jugador.get("avatarfull", "/static/default_avatar.png")
+        nombre = jugador.get("personaname", "Usuario")
+
+        # Analizar sentimiento
+        limpio = limpiar_texto(texto)
+        resultado = sentiment_analyzer(limpio, truncation=True)[0]
+        estrellas = int(resultado['label'][0])  # asume formato "5 stars"
+        imagen_estrella = f"/static/{estrellas}.png"
+
+        reviews.append({
+            "usuario": nombre,
+            "avatar": avatar,
+            "texto": texto,
+            "estrellas": estrellas,
+            "imagen_estrella": imagen_estrella
+        })
+
+        # Calcular media de estrellas
+        if reviews:
+            promedio = sum([r["estrellas"] for r in reviews]) / len(reviews)
+            if promedio < 1.5:
+                resumen_sentimiento = "Muy malo"
+            elif promedio < 2.5:
+                resumen_sentimiento = "Malo"
+            elif promedio < 3.5:
+                resumen_sentimiento = "Neutral"
+            elif promedio < 4.5:
+                resumen_sentimiento = "Bueno"
+            else:
+                resumen_sentimiento = "Muy bueno"
+        else:
+            resumen_sentimiento = "Sin reseñas suficientes"
+
+
+
+    return templates.TemplateResponse("juego.html", {
+    "request": request,
+    "juego": juego,
+    "reviews": reviews,
+    "nombre": request.session.get("nombre"),
+    "avatar": request.session.get("avatar"),
+    "resumen_sentimiento": resumen_sentimiento
     })
