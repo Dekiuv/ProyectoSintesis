@@ -26,6 +26,5 @@ while True:
     texto_limpio = limpiar_texto(texto)
     resultado = sentiment_analyzer(texto_limpio, truncation=True)[0]
     estrellas = int(resultado['label'][0])
-    sentimiento = "Negativo" if estrellas <= 2 else "Neutral" if estrellas == 3 else "Positivo"
-
+    sentimiento = "Muy malo" if estrellas == 1 else "Malo" if estrellas == 2 else "Neutral" if estrellas == 3 else "Bueno" if estrellas == 4 else "Muy bueno"
     print(f"\n📊 Sentimiento: {sentimiento} ({resultado['label']}) | Confianza: {resultado['score']:.2f}\n")
