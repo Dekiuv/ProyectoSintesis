@@ -2,9 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Tienda | Steamia</title>
+    <title>Steamia | Tienda</title>
     <link rel="stylesheet" href="/static/tienda.css">
     <link rel="stylesheet" href="/static/header.css">
+    <script src="/static/header.js"></script>
+    <link rel="icon" href="/static/logo.png" type="image/png">
 </head>
 <body>
     <header class="navbar">
@@ -35,8 +37,22 @@
     <div id="lista-amigos"></div>
   </div>
     <main>
-        <h1>Bienvenido {{ nombre }}</h1>
+        <h1>Bienvenido a Steamia, {{ nombre }}</h1>
+        <h2>Top 12 más vendidos:</h2>
+        <div class="recomendaciones">
+          {% for juego in top_juegos %}
+            <div class="card">
+              <img src="{{ juego.imagen }}" alt="{{ juego.nombre }}">
+              <div class="info">
+                <h3>{{ juego.nombre }}</h3>
+                <a href="/juego/{{ juego.appid }}" class="comprar-btn">Comprar juego</a>
+              </div>
+            </div>
+          {% endfor %}
 
+        </div>
+
+        <h2>{{ nombre }} te recomendamos:</h2>
         {% if recomendaciones %}
             <div class="recomendaciones">
                 {% for juego in recomendaciones %}
@@ -53,7 +69,11 @@
         {% else %}
             <p>❌ No se encontraron recomendaciones.</p>
         {% endif %}
+        <h2>Gente como tu también ha comprado:</h2>
     </main>
-    <script src="static/header.js"></script>
+    <footer class="footer">
+      <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+    </footer>
+<script src="static/header.js"></script>
 </body>
 </html>

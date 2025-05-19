@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>{{ juego.nombre }} | Steamia</title>
+  <title>Steamia | {{ juego.nombre }}</title>
   <link rel="stylesheet" href="/static/juego.css">
-  <link rel="stylesheet" href="/static/detalle_juego.css">
+  <link rel="icon" href="/static/logo.png" type="image/png">
 </head>
 <body>
   <header class="navbar">
@@ -46,12 +46,12 @@
     </section>
 
     <section class="recomendacion">
-      <h2>🔁 Recomendaciones (MBA)</h2>
+      <h2>Gente que ha comprado <b>{{ juego.nombre }}</b> también ha comprado</h2>
       <!-- Aquí pondrás recomendaciones más adelante -->
     </section>
 
     <section class="reviews">
-      <h2>🗨️ Reseñas más relevantes 
+      <h2>Reseñas de usuarios
         {% if resumen_sentimiento != "Sin reseñas suficientes" %}
           <small style="font-weight: normal;">(Los usuarios determinan este juego como <strong>{{ resumen_sentimiento }}</strong>)</small>
         {% endif %}
@@ -71,9 +71,9 @@
 
   </main>
 
-  <footer class="footer">
-    <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
-  </footer>
+<footer class="footer">
+  <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+</footer>
 
   <script src="/static/header.js"></script>
 </body>

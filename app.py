@@ -13,6 +13,7 @@ from gensim.models import Word2Vec
 import json
 import re
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+from bs4 import BeautifulSoup
 
 # ========== CARGAR MODELO SENTIMIENTO ==========
 print("⏳ Cargando modelo de sentimiento...")
@@ -70,6 +71,7 @@ def limpiar_texto(texto):
     texto = re.sub(r"[^\w\sáéíóúüñçàèìòùâêîôûäëïöü]", "", texto)
     texto = re.sub(r"\s+", " ", texto).strip()
     return texto
+
 
 # Página de login
 @app.get("/", response_class=HTMLResponse)
@@ -144,7 +146,7 @@ async def obtener_juegos(request: Request):
     for juego in juegos[:100]:
         appid = juego["appid"]
         nombre = juego["name"]
-        imagen = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+        imagen = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg"
 
         url_detalle = f"https://store.steampowered.com/api/appdetails?appids={appid}&cc=es&l=spanish"
         try:
@@ -298,6 +300,32 @@ def recomendar_desde_juegos(juegos_dict, topn=20, alpha=0.7):
         })
     return resultado
 
+def obtener_top_juegos():
+    url = "https://store.steampowered.com/search/?filter=topsellers&cc=es"
+    res = requests.get(url)
+    soup = BeautifulSoup(res.text, "lxml")
+
+    juegos = []
+    for entry in soup.select(".search_result_row")[:12]:
+        nombre = entry.find("span", class_="title").text.strip()
+        imagen = entry.find("img")["src"]
+        url_juego = entry["href"]
+        appid_match = re.search(r'/app/(\d+)/', url_juego)
+        appid = appid_match.group(1) if appid_match else None
+
+        price_tag = entry.find('div', class_='search_price')
+        precio = price_tag.text.strip() if price_tag else "No disponible"
+
+        if appid:
+            juegos.append({
+                "nombre": nombre,
+                "imagen": imagen,
+                "appid": appid
+            })
+
+    return juegos
+
+
 # === Página de tienda ===
 @app.get("/tienda", response_class=HTMLResponse)
 async def mostrar_tienda(request: Request):
@@ -308,17 +336,20 @@ async def mostrar_tienda(request: Request):
     juegos_dict = obtener_juegos_usuario_con_tiempo(steam_id)
     juegos_validos = {j: p for j, p in juegos_dict.items() if j in modelo.wv}
     recomendaciones = recomendar_desde_juegos(juegos_validos, 50, 0.8)
+    top_juegos = obtener_top_juegos()
 
     return templates.TemplateResponse("tienda.html", {
         "request": request,
         "avatar": request.session.get("avatar"),
         "nombre": request.session.get("nombre"),
-        "recomendaciones": recomendaciones
+        "recomendaciones": recomendaciones,
+        "top_juegos": top_juegos
     })
 
 @app.get("/juego/{appid}", response_class=HTMLResponse)
 async def detalle_juego(request: Request, appid: int):
     # Datos del juego
+    resumen_sentimiento = "Sin reseñas suficientes"
     url = f"https://store.steampowered.com/api/appdetails?appids={appid}&cc=es&l=spanish"
     res = requests.get(url)
     data = res.json()

@@ -5,6 +5,7 @@
   <title>Steamia | Biblioteca</title>
   <link rel="stylesheet" href="/static/biblioteca.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="icon" href="/static/logo.png" type="image/png">
 </head>
 <body>
   <header class="navbar">
@@ -56,7 +57,7 @@
         <h2 id="modal-nombre"></h2>
         <p id="modal-categorias"></p>
         <p id="modal-descripcion"></p>
-        <a id="modal-link" href="#" target="_blank" class="ver-mas-btn">Ver en Steam</a>
+        <a id="modal-link" href="" target="_blank" class="ver-mas-btn">Ver en Steam</a>
       </div>
     </div>
   </main>
@@ -97,7 +98,7 @@
     document.getElementById("modal-nombre").textContent = juego.nombre;
     document.getElementById("modal-descripcion").textContent = juego.descripcion;
     document.getElementById("modal-categorias").textContent = juego.categorias?.join(", ") || "Sin categorías";
-    document.getElementById("modal-link").href = `https://store.steampowered.com/app/${juego.appid}`;
+    document.getElementById("modal-link").href = `/juego/${juego.appid}`;
     document.getElementById("juego-modal").classList.remove("hidden");
     document.getElementById("juego-modal").style.display = "flex";
   }
