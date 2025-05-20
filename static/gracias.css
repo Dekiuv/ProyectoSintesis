@@ -1,0 +1,21 @@
+.carrito-item {
+  display: flex;
+  background-color: #2a475e;
+  border-radius: 20px;
+  margin: 10px 0;
+  padding: 10px;
+  align-items: center;
+}
+
+.carrito-item img {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-right: 15px;
+}
+
+.carrito-info p {
+  margin: 5px 0;
+  color: white;
+}

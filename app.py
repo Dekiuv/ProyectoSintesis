@@ -524,3 +524,89 @@ async def detalle_juego(request: Request, appid: int):
     "avatar": request.session.get("avatar"),
     "resumen_sentimiento": resumen_sentimiento
     })
+
+
+@app.post("/agregar_al_carrito")
+async def agregar_al_carrito(request: Request, appid: int = Form(...)):
+    if "carrito" not in request.session:
+        request.session["carrito"] = []
+
+    appid_str = str(appid)
+
+    # Consultar API para tener precio más actualizado
+    url = f"https://store.steampowered.com/api/appdetails?appids={appid}&cc=es&l=spanish"
+    res = requests.get(url)
+    data = res.json()
+    juego_data = data.get(appid_str, {}).get("data", {})
+
+    if not juego_data:
+        return RedirectResponse("/carrito", status_code=302)
+
+    nombre = juego_data.get("name", "Desconocido")
+    imagen = juego_data.get("header_image", "/static/default.png")
+    precio_raw = juego_data.get("price_overview", {}).get("final_formatted", "Gratis")
+
+    # Convertir precio a número para poder sumar
+    try:
+        if "gratis" in precio_raw.lower():
+            precio = 0.0
+        else:
+            precio = float(precio_raw.replace("€", "").replace(",", ".").strip())
+    except Exception:
+        precio = 0.0  # Si falla, consideramos gratis
+
+    request.session["carrito"].append({
+        "appid": appid,
+        "nombre": nombre,
+        "imagen": imagen,
+        "precio": precio,
+        "precio_str": precio_raw  # guardamos string para mostrar
+    })
+
+    return RedirectResponse("/carrito", status_code=302)
+
+
+def convertir_precio(precio_str):
+    precio_str = str(precio_str)
+    if "gratis" in precio_str.lower():
+        return 0.0
+    return float(precio_str.replace("€", "").replace(",", ".").strip())
+
+
+@app.get("/carrito", response_class=HTMLResponse)
+async def mostrar_carrito(request: Request):
+    carrito = request.session.get("carrito", [])
+    total = sum(convertir_precio(j["precio"]) for j in carrito)
+    return templates.TemplateResponse("carrito.html", {
+        "request": request,
+        "carrito": carrito,
+        "total_precio": f"{total:.2f}"
+    })
+
+
+@app.post("/eliminar_del_carrito")
+async def eliminar_del_carrito(request: Request, appid: int = Form(...)):
+    carrito = request.session.get("carrito", [])
+    request.session["carrito"] = [j for j in carrito if j["appid"] != appid]
+    return RedirectResponse("/carrito", status_code=302)
+
+@app.get("/gracias", response_class=HTMLResponse)
+async def gracias(request: Request):
+    compra = request.session.get("compra_realizada", [])
+    email = request.session.get("correo", "")
+    return templates.TemplateResponse("gracias.html", {
+        "request": request,
+        "compra": compra,
+        "email": email
+    })
+
+
+from fastapi import Form
+
+@app.post("/comprar")
+async def procesar_compra(request: Request, email: str = Form(...)):
+    carrito = request.session.get("carrito", [])
+    request.session["compra_realizada"] = carrito
+    request.session["carrito"] = []  # Limpia el carrito
+    request.session["correo"] = email
+    return RedirectResponse("/gracias", status_code=302)

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Steamia | Carrito</title>
+    <link rel="stylesheet" href="/static/header.css">
+    <link rel="stylesheet" href="/static/carrito.css">
+    <script src="/static/header.js"></script>
+    <link rel="icon" href="/static/logo.png" type="image/png">
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
+        <nav class="menu">
+          <a href="/tienda">Tienda</a>
+          <a href="/biblioteca">Biblioteca</a>
+          <a href="/soporte">Soporte</a>
+          <a href="/carrito">Carrito</a>
+        </nav>
+        <div class="usuario" onclick="toggleDropdown()">
+          <span class="nombre-usuario">{{ nombre }}</span>
+          <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
+    
+          <div id="dropdownMenu" class="dropdown hidden">
+            <button onclick="abrirAmigos(event)">Amigos</button>
+            <button onclick="window.location.href='/logout'">Cerrar sesión</button>
+          </div>
+        </div>
+      </header>
+ <!-- PANEL DE AMIGOS (popup lateral derecho) -->
+ <div id="panel-amigos" class="panel-amigos hidden">
+    <div class="panel-header">
+      <h3>Amigos</h3>
+      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
+    </div>
+    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
+    <div id="lista-amigos"></div>
+  </div>
+    <main class="carrito-contenedor">
+    <h1>Mi carrito</h1>
+
+    {% if carrito %}
+    <div class="carrito-lista">
+        {% for juego in carrito %}
+        <div class="carrito-item">
+        <img src="{{ juego.imagen }}" alt="{{ juego.nombre }}">
+        <div class="carrito-info">
+            <p class="juego-nombre">{{ juego.nombre }}</p>
+            <p class="juego-precio">{{ juego.precio_str }}</p>
+            <form method="post" action="/eliminar_del_carrito">
+            <input type="hidden" name="appid" value="{{ juego.appid }}">
+            <button type="submit" class="eliminar-btn">🗑 Eliminar</button>
+            </form>
+        </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form method="post" action="/comprar" class="form-compra">
+        <input type="email" name="email" placeholder="Introduce tu correo electrónico" required>
+        <button type="submit">Comprar ({{ total_precio }}€)</button>
+    </form>
+    {% else %}
+        <p class="vacio">🛒 Tu carrito está vacío.</p>
+    {% endif %}
+
+    <h2>Podría interesarte (MBA)</h2>
+    </main>
+
+    <footer class="footer">
+      <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+    </footer>
+<script src="static/header.js"></script>
+</body>
+</html>

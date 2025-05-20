@@ -1,0 +1,146 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #1b2838;
+  color: white;
+}
+
+main.carrito-contenedor {
+  padding: 100px 40px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+h1, h2 {
+  margin-bottom: 20px;
+}
+
+.carrito-lista {
+  background-color: #3a5a97;
+  border-radius: 30px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.carrito-item {
+  display: flex;
+  align-items: center;
+  background-color: #003366;
+  padding: 15px;
+  border-radius: 8px;
+  gap: 15px;
+}
+
+.carrito-item img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #1b2838;
+}
+
+.carrito-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.carrito-info p {
+  margin: 5px 0;
+}
+
+.carrito-info form {
+  margin-left: 20px;
+}
+
+.carrito-info button {
+  background-color: #e74c3c;
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.carrito-info button:hover {
+  background-color: #c0392b;
+}
+
+/* Formulario de compra */
+form[action="/comprar"] {
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+form[action="/comprar"] input[type="email"] {
+  padding: 12px 20px;
+  border-radius: 30px;
+  border: none;
+  font-size: 16px;
+  width: 100%;
+  max-width: 400px;
+  background-color: #4a65e5;
+  color: white;
+  outline: none;
+  margin-left: 270px;
+}
+
+form[action="/comprar"] input[type="email"]::placeholder {
+  color: #d3d3d3;
+}
+
+form[action="/comprar"] button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #2ecc71;
+  color: #1b2838;
+  transition: background 0.3s ease;
+}
+
+form[action="/comprar"] button:hover {
+  background-color: #27ae60;
+}
+
+/* Recomendaciones (MBA) */
+h2:last-of-type {
+  margin-top: 40px;
+  font-size: 22px;
+  font-weight: bold;
+}
+
+    /* Footer */
+.footer {
+  background-color: #171a21;
+  color: white;
+  text-align: center;
+  padding: 20px;
+  font-size: 14px;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.3);
+}
+
+html, body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+.hidden {
+  display: none !important;
+}
