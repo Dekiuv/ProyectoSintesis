@@ -680,10 +680,18 @@ from fastapi import Form
 @app.post("/comprar")
 async def procesar_compra(request: Request, email: str = Form(...)):
     carrito = request.session.get("carrito", [])
+    total = sum(float(j["precio"]) for j in carrito)
+
+    # Guardar compra para página de agradecimiento
     request.session["compra_realizada"] = carrito
-    request.session["carrito"] = []  # Limpia el carrito
+    request.session["carrito"] = []
     request.session["correo"] = email
+
+    # ✉️ Enviar correo
+    enviar_correo_confirmacion(email, carrito, total)
+
     return RedirectResponse("/gracias", status_code=302)
+
 
 @app.get("/api/recomendacionesmba_carrito")
 async def recomendar_mba_desde_carrito(request: Request):
@@ -766,3 +774,34 @@ async def recomendar_mba_desde_carrito(request: Request):
             break
 
     return {"recomendaciones": resultados}
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def enviar_correo_confirmacion(destinatario: str, carrito: list, total: float):
+    remitente = "steamia.soporte@gmail.com"
+    contraseña = "bsty vcgw wxlc btyi"
+
+    # Crear el contenido del mensaje
+    mensaje = MIMEMultipart("alternative")
+    mensaje["Subject"] = "Confirmación de compra - Steamia"
+    mensaje["From"] = remitente
+    mensaje["To"] = destinatario
+
+    cuerpo_html = "<h2>Gracias por tu compra en Steamia 🧠</h2>"
+    cuerpo_html += "<ul>"
+    for juego in carrito:
+        cuerpo_html += f"<li>{juego['nombre']} - {juego['precio_str']}</li>"
+    cuerpo_html += "</ul>"
+    cuerpo_html += f"<p><strong>Total:</strong> {total:.2f}€</p>"
+
+    mensaje.attach(MIMEText(cuerpo_html, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+            servidor.login(remitente, contraseña)
+            servidor.sendmail(remitente, destinatario, mensaje.as_string())
+        print("✅ Correo enviado con éxito.")
+    except Exception as e:
+        print(f"❌ Error al enviar el correo: {e}")
