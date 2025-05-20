@@ -13,7 +13,7 @@
       <a href="/tienda">Tienda</a>
       <a href="/biblioteca">Biblioteca</a>
       <a href="/soporte">Soporte</a>
-      <a href="#">Carrito</a>
+      <a href="/carrito">Carrito</a>
     </nav>
     <div class="usuario" onclick="toggleDropdown()">
       <span class="nombre-usuario">{{ nombre }}</span>
@@ -41,7 +41,12 @@
         <h1>{{ juego.nombre }}</h1>
         <p class="descripcion">{{ juego.descripcion }}</p>
         <p><strong>Categorías:</strong> {{ juego.categorias | join(', ') }}</p>
-        <a href="https://store.steampowered.com/app/{{ juego.appid }}" target="_blank" class="comprar-btn">Comprar ({{ juego.precio }})</a>
+        <form method="post" action="/agregar_al_carrito">
+          <input type="hidden" name="appid" value="{{ juego.appid }}">
+          <button type="submit" class="comprar-btn">Comprar ({{ juego.precio }})</button>
+        </form>
+
+
       </div>
     </section>
 
