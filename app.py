@@ -694,80 +694,92 @@ async def procesar_compra(request: Request, email: str = Form(...)):
 
 
 @app.get("/api/recomendacionesmba_carrito")
-async def recomendar_mba_desde_carrito(request: Request):
-    # Paso 1: Obtener juegos del carrito desde la sesión
+async def recomendar_mba_para_carrito(request: Request):
+    # 🧺 1. Juegos del carrito
     carrito = request.session.get("carrito", [])
-    if not carrito:
-        print("⚠️ El carrito está vacío.")
+    appids_carrito = {j["appid"] for j in carrito}
+
+    # 👤 2. Juegos jugados del usuario en Steam (API)
+    steam_id = request.session.get("steam_id")
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
+        {"steamid": steam_id, "format": "json"}
+    )
+    appids_steam = {
+        juego["appid"] for juego in datos.get("response", {}).get("games", [])
+        if juego.get("playtime_forever", 0) > 0
+    } if datos else set()
+
+    # ✅ 3. Unión de juegos que queremos evitar recomendar
+    appids_evitar = appids_carrito.union(appids_steam)
+
+    if not appids_carrito:
         return {"recomendaciones": []}
 
-    appids = {j["appid"] for j in carrito if "appid" in j}
-
-    if not appids:
-        print("⚠️ No hay appids válidos en el carrito.")
-        return {"recomendaciones": []}
-
-    # Paso 2: Cargar matriz y modelos
+    # 📊 4. Modelos y matriz
     matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
     pca = load("modelo_pca.joblib")
     kmeans = load("modelo_kmeans.joblib")
     columnas_appids = pd.read_pickle("appids_entrenados.pkl")
 
-    # Paso 3: Crear vector binario del usuario
-    appids_validos = appids & set(columnas_appids)
-    if not appids_validos:
-        return {"recomendaciones": []}
-
+    # 📌 5. Vector binario del carrito
     vector_usuario = pd.Series(0, index=columnas_appids)
-    vector_usuario[list(appids_validos)] = 1
+    vector_usuario[list(appids_carrito & set(columnas_appids))] = 1
 
-    # Paso 4: Asignar cluster
+    # 🔢 6. Cluster del carrito
     vector_reducido = pca.transform([vector_usuario])
     cluster = int(kmeans.predict(vector_reducido)[0])
     print(f"🧠 Carrito asignado al cluster {cluster}")
 
-    # Paso 5: Cargar reglas
+    # 📁 7. Reglas
     reglas_path = f"reglas_cluster_{cluster}.csv"
     if not Path(reglas_path).exists():
         return {"recomendaciones": []}
 
     reglas = pd.read_csv(reglas_path)
-    if isinstance(reglas['antecedents'].iloc[0], str) and reglas['antecedents'].str.startswith('frozenset').any():
-        reglas['antecedents'] = reglas['antecedents'].apply(eval)
-        reglas['consequents'] = reglas['consequents'].apply(eval)
-    else:
-        reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
-        reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
 
-    # Paso 6: Nombres y filtrado de recomendaciones
+    # 🧠 Eval frozensets si vienen como string
+    if isinstance(reglas['antecedents'].iloc[0], str):
+        if reglas['antecedents'].str.startswith('frozenset').any():
+            reglas['antecedents'] = reglas['antecedents'].apply(eval)
+            reglas['consequents'] = reglas['consequents'].apply(eval)
+        else:
+            from ast import literal_eval
+            reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
+            reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
+
+    # 🧾 8. Cargar nombres
     nombres_juegos = pd.read_csv("nombres_juegos.csv").set_index("appid")["name"].to_dict()
+
+    # 🧠 9. Reglas aplicables y filtradas
     recomendaciones = []
     for _, fila in reglas.iterrows():
-        if fila['antecedents'].issubset(appids_validos) and not fila['consequents'].issubset(appids_validos):
+        if fila['antecedents'].issubset(appids_carrito) and not fila['consequents'].issubset(appids_evitar):
             appid = list(fila['consequents'])[0]
-            recomendaciones.append((appid, fila['confidence'], fila['lift']))
+            if appid not in appids_evitar:
+                recomendaciones.append((appid, fila['confidence'], fila['lift']))
 
     if not recomendaciones:
         return {"recomendaciones": []}
 
+    # 📦 10. Resultado final único + imagen
     recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))
-
-    # Paso 7: Añadir datos de los juegos
-    resultados = []
     vistos = set()
+    resultados = []
+
     for appid, _, _ in recomendaciones:
-        if appid in vistos:
+        if appid in vistos or appid in appids_evitar:
             continue
         vistos.add(appid)
 
         nombre = nombres_juegos.get(appid, f"Juego {appid}")
-        info_extra = obtener_datos_juego(appid)
+        info = obtener_datos_juego(appid)
 
         resultados.append({
             "item_id": appid,
             "nombre": nombre,
-            "imagen": info_extra["imagen"],
-            "descripcion": info_extra["descripcion"]
+            "imagen": info["imagen"],
+            "descripcion": info["descripcion"]
         })
 
         if len(resultados) >= 10:

@@ -75,5 +75,38 @@
       <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
     </footer>
 <script src="static/header.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    fetch("/api/recomendacionesmba_carrito")
+      .then(response => response.json())
+      .then(data => {
+        const contenedor = document.getElementById("recomendaciones-mba");
+        contenedor.innerHTML = ""; // limpiar el texto de "Cargando..."
+
+        if (data.recomendaciones && data.recomendaciones.length > 0) {
+          data.recomendaciones.forEach(juego => {
+            const card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+              <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
+              <div class="info">
+                <h3>${juego.nombre}</h3>
+                <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
+              </div>
+            `;
+            contenedor.appendChild(card);
+          });
+        } else {
+          contenedor.innerHTML = "<p>❌ No se encontraron recomendaciones basadas en tu carrito.</p>";
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("recomendaciones-mba").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
+      });
+  });
+</script>
+
 </body>
 </html>
