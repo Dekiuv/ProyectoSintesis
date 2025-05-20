@@ -24,7 +24,13 @@ main h2{
   gap: 25px;
   padding: 10px 20px 60px;
 }
-
+.recomendacionesmba {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 25px;
+  padding: 10px 20px 60px;
+}
 /* Cada tarjeta de juego */
 .card {
   background-color: #2a475e;

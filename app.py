@@ -596,18 +596,30 @@ async def recomendar_mba_para_usuario(request: Request):
         return {"recomendaciones": []}
 
     # Paso 8: Mostrar top recomendaciones con nombres e info
-    recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))[:10]
+    recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))
+
+    # Usamos un conjunto para evitar juegos repetidos
+    vistos = set()
     resultados = []
+
     for appid, _, _ in recomendaciones:
+        if appid in vistos:
+            continue  # saltar duplicado
+        vistos.add(appid)
+
         nombre = nombres_juegos.get(appid, f"Juego {appid}")
-        info_extra = obtener_datos_juego(appid)  # ✅ LLAMADA AQUÍ
+        info_extra = obtener_datos_juego(appid)
+
         resultados.append({
             "item_id": appid,
             "nombre": nombre,
             "imagen": info_extra["imagen"],
             "descripcion": info_extra["descripcion"]
         })
-    
+
+        if len(resultados) >= 10:
+            break
+
     return {"recomendaciones": resultados}
 
 
