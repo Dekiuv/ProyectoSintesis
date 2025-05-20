@@ -531,20 +531,24 @@ async def detalle_juego(request: Request, appid: int):
 
 @app.get("/api/recomendacionesmba")
 async def recomendar_mba_para_usuario(request: Request):
-    # Paso 1: Obtener juegos del usuario desde la API de Steam
+    # Paso 1: Obtener juegos del usuario desde la API de Steam usando función reutilizable
     steam_id = request.session.get("steam_id")
     
-    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
-    response = requests.get(url)
-    if response.status_code != 200:
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
+        {"steamid": steam_id, "format": "json"}
+    )
+
+    if not datos or "games" not in datos.get("response", {}):
         print("❌ Error al obtener los juegos del usuario desde la API.")
-        return
-    juegos_usuario = response.json().get("response", {}).get("games", [])
+        return {"recomendaciones": []}
+
+    juegos_usuario = datos["response"]["games"]
     appids_usuario = {j["appid"] for j in juegos_usuario if j.get("playtime_forever", 0) > 0}
 
     if not appids_usuario:
         print("⚠️ El usuario no tiene juegos jugados.")
-        return
+        return {"recomendaciones": []}
 
     # Paso 2: Cargar matriz binaria original y modelos
     matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
@@ -565,7 +569,7 @@ async def recomendar_mba_para_usuario(request: Request):
     reglas_path = f"reglas_cluster_{cluster}.csv"
     if not Path(reglas_path).exists():
         print("⚠️ No hay reglas guardadas para este cluster.")
-        return
+        return {"recomendaciones": []}
 
     reglas = pd.read_csv(reglas_path)
 
@@ -589,14 +593,24 @@ async def recomendar_mba_para_usuario(request: Request):
 
     if not recomendaciones:
         print("🤷 No se encontraron recomendaciones para este usuario.")
-        return
+        return {"recomendaciones": []}
 
-    # Paso 8: Mostrar top recomendaciones con nombres
+    # Paso 8: Mostrar top recomendaciones con nombres e info
     recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))[:10]
-    print("\n🎯 Recomendaciones MBA para el usuario:")
-    for appid, conf, lift in recomendaciones:
-        nombre = nombres_juegos.get(appid, f"(Nombre no encontrado) AppID {appid}")
-        print(f" - {nombre} (AppID {appid}) — Confianza: {conf:.2f}, Lift: {lift:.2f}")
+    resultados = []
+    for appid, _, _ in recomendaciones:
+        nombre = nombres_juegos.get(appid, f"Juego {appid}")
+        info_extra = obtener_datos_juego(appid)  # ✅ LLAMADA AQUÍ
+        resultados.append({
+            "item_id": appid,
+            "nombre": nombre,
+            "imagen": info_extra["imagen"],
+            "descripcion": info_extra["descripcion"]
+        })
+    
+    return {"recomendaciones": resultados}
+
+
 
 @app.post("/agregar_al_carrito")
 async def agregar_al_carrito(request: Request, appid: int = Form(...)):
