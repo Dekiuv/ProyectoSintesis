@@ -32,15 +32,15 @@ templates = Jinja2Templates(directory="templates")
 
 load_dotenv()
 STEAM_KEYS = [
-    ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
+    # ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
     ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
-    ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
-    ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
+    # ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
+    # ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
 ]
 
 # === Cargar modelo de recomendación ===
-modelo = Word2Vec.load("modelo_word2vec_mejorado.model")
+modelo = Word2Vec.load("word2vec_steam.model")
 df_meta = pd.read_csv("steam_juegos_metadata.csv").fillna("")
 df_meta["appid"] = df_meta["appid"].astype(str)
 metadata_dict = df_meta.set_index("appid").to_dict(orient="index")
@@ -60,10 +60,13 @@ def llamar_api_steam(url, params, timeout=5):
             res = requests.get(url, params=full_params, timeout=timeout)
             res.raise_for_status()
             print(f"✅ Usando API Key de {nombre}")
+
+            
             return res.json()
         except Exception as e:
             print(f"⚠️ Error con la clave de {nombre}: {e}")
     return None
+
 
 def limpiar_texto(texto):
     texto = texto.lower()
@@ -80,10 +83,13 @@ async def login_form(request: Request):
 
 @app.post("/login")
 async def login(request: Request, steam_id: str = Form(...)):
+    print("🧪 steam_id recibido:", steam_id)
+
     datos = llamar_api_steam(
         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
         {"steamid": steam_id, "include_appinfo": "true"}
     )
+    print("📦 Respuesta de GetOwnedGames:", datos)
 
     if not datos or not datos.get("response") or datos["response"].get("game_count", 0) == 0:
         return templates.TemplateResponse(
@@ -262,43 +268,133 @@ def obtener_juegos_usuario_con_tiempo(steam_id):
     juegos = datos.get("response", {}).get("games", []) if datos else []
     return {str(j["appid"]): j.get("playtime_forever", 0) for j in juegos if j.get("playtime_forever", 0) > 0}
 
-def recomendar_desde_juegos(juegos_dict, topn=20, alpha=0.7):
-    similares = {}
-    for item_id, playtime in juegos_dict.items():
-        if item_id in modelo.wv:
-            peso = min(playtime / 60, 10)
-            try:
-                similares_raw = modelo.wv.most_similar(item_id, topn=50)
-                print(similares_raw)
-            except KeyError:
+import os
+import requests
+import pandas as pd
+
+from fastapi.responses import JSONResponse
+
+@app.get("/api/recomendacionesw2v")
+async def api_recomendaciones(request: Request):
+    steam_id = request.session.get("steam_id")
+    if not steam_id:
+        return JSONResponse(content={"error": "No hay usuario en sesión"}, status_code=401)
+
+    _, recomendaciones, _ = recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id)
+    return JSONResponse(content={"recomendaciones": recomendaciones})
+
+
+# Lista de claves con prioridad
+def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, topn=30):
+    """
+    Recomienda juegos a un usuario de Steam usando un modelo Word2Vec entrenado.
+    Selecciona automáticamente la mejor API key disponible.
+
+    Returns:
+        jugados_nombres (list[str]): juegos jugados con nombre.
+        recomendados (list[dict]): recomendaciones detalladas.
+        mensaje (str): mensaje resumen del proceso.
+    """
+
+    # Cargar nombres
+    try:
+        appid_to_name = pd.read_csv("nombres_juegos.csv").set_index("appid")["name"].to_dict()
+    except Exception as e:
+        return [], [], f"❌ Error al cargar nombres de juegos: {e}"
+
+    # Buscar una API Key válida
+    appids = []
+    clave_usada = None
+    for nombre, clave in STEAM_KEYS:
+        if not clave:
+            continue
+
+        url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
+        params = {
+            "key": clave,
+            "steamid": steam_id,
+            "include_appinfo": 1,
+            "format": "json"
+        }
+
+        try:
+            response = requests.get(url, params=params)
+            print(response)
+            response.raise_for_status()
+            juegos_usuario = response.json().get("response", {}).get("games", [])
+            appids = [str(j["appid"]) for j in juegos_usuario if j.get("playtime_forever", 0) > 0]
+            clave_usada = nombre
+            break
+        except Exception:
+            continue  # Probar la siguiente clave
+
+    if not appids:
+        print("❌ No se pudieron obtener los juegos del usuario con ninguna API Key.")
+        return [], [], "❌ No se pudieron obtener los juegos del usuario con ninguna API Key."
+
+    # Filtrar appids válidos
+    appids_validos = [a for a in appids if a in modelo.wv.key_to_index]
+
+    ignorados = len(appids) - len(appids_validos)
+    jugados_nombres = [appid_to_name.get(int(a), f"Unknown ({a})") for a in appids_validos]
+
+    if not appids_validos:
+        return jugados_nombres, [], "⚠️ Ningún juego jugado está en el vocabulario del modelo."
+
+    # Generar recomendaciones
+    try:
+        recomendaciones = modelo.wv.most_similar(appids_validos, topn=topn * 2)
+        recomendados = []
+        for appid, similitud in recomendaciones:
+            if appid in appids_validos:
                 continue
+            nombre = appid_to_name.get(int(appid), f"Unknown ({appid})")
+            info_extra = obtener_datos_juego(appid)
 
-            for similar_id, score in similares_raw:
-                if similar_id not in metadata_dict or similar_id in juegos_dict:
-                    continue
+            recomendados.append({
+                "item_id": int(appid),
+                "nombre": nombre,
+                "score": round(similitud, 4),
+                "metacritic": None,
+                "imagen": info_extra["imagen"],
+                "descripcion": info_extra["descripcion"]
+            })
 
-                metacritic = metadata_dict[similar_id].get("metacritic_score", 0)
-                try:
-                    metacritic = float(metacritic) / 100 if metacritic else 0
-                except:
-                    metacritic = 0
+            if len(recomendados) >= topn:
+                break
 
-                score_final = peso * (alpha * score + (1 - alpha) * metacritic)
-                similares[similar_id] = similares.get(similar_id, 0) + score_final
+    except Exception as e:
+        return jugados_nombres, [], f"❌ Error al generar recomendaciones: {e}"
 
-    recomendaciones = sorted(similares.items(), key=lambda x: x[1], reverse=True)[:topn]
-    resultado = []
-    for item_id, score in recomendaciones:
-        meta = metadata_dict[item_id]
-        resultado.append({
-            "item_id": item_id,
-            "nombre": meta["name"],
-            "score": round(score, 4),
-            "metacritic": meta.get("metacritic_score"),
-            "imagen": meta.get("header_image"),
-            "descripcion": meta.get("short_description")
-        })
-    return resultado
+    mensaje = f"✅ Recomendaciones generadas correctamente con clave {clave_usada}"
+    if ignorados > 0:
+        mensaje += f" (⚠️ {ignorados} juegos ignorados por no estar en el modelo)"
+    return jugados_nombres, recomendados, mensaje
+
+
+def obtener_datos_juego(appid):
+    """Llama a la API de Steam Store para obtener imagen y descripción"""
+    try:
+        url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
+        res = requests.get(url, timeout=5)
+        res.raise_for_status()
+        datos = res.json()
+        info = datos.get(str(appid), {})
+        
+        if not info.get("success", False):
+            print(f"⚠️ AppID {appid} no tiene datos válidos (success=False)")
+            return {"imagen": None, "descripcion": None}
+
+        data = info.get("data", {})
+        return {
+            "imagen": data.get("header_image"),
+            "descripcion": data.get("short_description")
+        } if data else {"imagen": None, "descripcion": None}
+    except Exception as e:
+        print(f"❌ Error al obtener datos del juego {appid}: {e}")
+        return {"imagen": None, "descripcion": None}
+
+
 
 def obtener_top_juegos():
     url = "https://store.steampowered.com/search/?filter=topsellers&cc=es"
@@ -335,9 +431,10 @@ async def mostrar_tienda(request: Request):
 
     juegos_dict = obtener_juegos_usuario_con_tiempo(steam_id)
     juegos_validos = {j: p for j, p in juegos_dict.items() if j in modelo.wv}
-    recomendaciones = recomendar_desde_juegos(juegos_validos, 50, 0.8)
+    _, recomendaciones, _  = recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, 50)
+    print("---------------------_",recomendaciones)
     top_juegos = obtener_top_juegos()
-
+    
     return templates.TemplateResponse("tienda.html", {
         "request": request,
         "avatar": request.session.get("avatar"),

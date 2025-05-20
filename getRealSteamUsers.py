@@ -3,7 +3,6 @@ import os
 import requests
 import time
 import csv
-import json
 from collections import deque
 
 # === Cargar API Keys ===
@@ -50,25 +49,15 @@ def obtener_amigos(steam_id):
     return [amigo["steamid"] for amigo in data["friendslist"].get("friends", [])]
 
 # === Función principal ===
-def recolectar_datos_steam(steam_id_inicial, max_usuarios=1000, output_csv="usuarios_steam_detallado.csv", estado_guardado="estado_progreso.json"):
+def recolectar_datos_steam(steam_id_inicial, max_usuarios=1000, output_csv="usuarios_steam_detallado.csv"):
     visitados = set()
     cola = deque([steam_id_inicial])
     total = 0
 
-    # Cargar estado previo si existe
-    if os.path.exists(estado_guardado):
-        with open(estado_guardado, "r", encoding="utf-8") as f:
-            estado = json.load(f)
-            visitados = set(estado.get("visitados", []))
-            cola = deque(estado.get("cola", []))
-            total = estado.get("total", 0)
-            print(f"🔄 Reanudando desde el estado guardado: {total} usuarios ya procesados.")
-
-    existe = os.path.isfile(output_csv)
-    with open(output_csv, mode="a", newline="", encoding="utf-8") as f:
+    # Crear archivo CSV y escribir encabezado
+    with open(output_csv, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        if not existe:
-            writer.writerow(["steam_id", "appid", "name", "playtime_forever", "playtime_2weeks", "img_icon_url", "has_stats", "has_leaderboards", "content_descriptorids"])
+        writer.writerow(["steam_id", "appid", "name", "playtime_forever", "playtime_2weeks", "img_icon_url", "has_stats", "has_leaderboards", "content_descriptorids"])
 
         while cola and total < max_usuarios:
             steam_id = cola.popleft()
@@ -100,11 +89,6 @@ def recolectar_datos_steam(steam_id_inicial, max_usuarios=1000, output_csv="usua
                     cola.append(amigo_id)
 
             visitados.add(steam_id)
-
-            # Guardar estado
-            with open(estado_guardado, "w", encoding="utf-8") as ef:
-                json.dump({"visitados": list(visitados), "cola": list(cola), "total": total}, ef)
-
             time.sleep(1.5)  # Para evitar bloqueos por parte de la API
 
     print(f"✅ Recolección completada. Total usuarios: {total}. Datos guardados en '{output_csv}'.")
