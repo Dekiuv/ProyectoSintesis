@@ -531,20 +531,24 @@ async def detalle_juego(request: Request, appid: int):
 
 @app.get("/api/recomendacionesmba")
 async def recomendar_mba_para_usuario(request: Request):
-    # Paso 1: Obtener juegos del usuario desde la API de Steam
+    # Paso 1: Obtener juegos del usuario desde la API de Steam usando función reutilizable
     steam_id = request.session.get("steam_id")
     
-    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
-    response = requests.get(url)
-    if response.status_code != 200:
+    datos = llamar_api_steam(
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
+        {"steamid": steam_id, "format": "json"}
+    )
+
+    if not datos or "games" not in datos.get("response", {}):
         print("❌ Error al obtener los juegos del usuario desde la API.")
-        return
-    juegos_usuario = response.json().get("response", {}).get("games", [])
+        return {"recomendaciones": []}
+
+    juegos_usuario = datos["response"]["games"]
     appids_usuario = {j["appid"] for j in juegos_usuario if j.get("playtime_forever", 0) > 0}
 
     if not appids_usuario:
         print("⚠️ El usuario no tiene juegos jugados.")
-        return
+        return {"recomendaciones": []}
 
     # Paso 2: Cargar matriz binaria original y modelos
     matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
@@ -565,7 +569,7 @@ async def recomendar_mba_para_usuario(request: Request):
     reglas_path = f"reglas_cluster_{cluster}.csv"
     if not Path(reglas_path).exists():
         print("⚠️ No hay reglas guardadas para este cluster.")
-        return
+        return {"recomendaciones": []}
 
     reglas = pd.read_csv(reglas_path)
 
@@ -589,14 +593,17 @@ async def recomendar_mba_para_usuario(request: Request):
 
     if not recomendaciones:
         print("🤷 No se encontraron recomendaciones para este usuario.")
-        return
+        return {"recomendaciones": []}
 
     # Paso 8: Mostrar top recomendaciones con nombres
     recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))[:10]
-    print("\n🎯 Recomendaciones MBA para el usuario:")
-    for appid, conf, lift in recomendaciones:
-        nombre = nombres_juegos.get(appid, f"(Nombre no encontrado) AppID {appid}")
-        print(f" - {nombre} (AppID {appid}) — Confianza: {conf:.2f}, Lift: {lift:.2f}")
+    resultados = [{
+        "item_id": appid,
+        "nombre": nombres_juegos.get(appid, f"Juego {appid}")
+    } for appid, _, _ in recomendaciones]
+
+    return {"recomendaciones": resultados}
+
 
 @app.post("/agregar_al_carrito")
 async def agregar_al_carrito(request: Request, appid: int = Form(...)):
@@ -695,50 +702,49 @@ async def procesar_compra(request: Request, email: str = Form(...)):
 
 @app.get("/api/recomendacionesmba_carrito")
 async def recomendar_mba_para_carrito(request: Request):
-    # 🧺 1. Juegos del carrito
+    # 1. Obtener juegos del carrito desde la sesión
     carrito = request.session.get("carrito", [])
     appids_carrito = {j["appid"] for j in carrito}
 
-    # 👤 2. Juegos jugados del usuario en Steam (API)
+    # 2. Obtener juegos jugados por el usuario desde la API de Steam
     steam_id = request.session.get("steam_id")
     datos = llamar_api_steam(
-        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
-        {"steamid": steam_id, "format": "json"}
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
+        {"steamid": steam_id, "include_appinfo": "true"}
     )
     appids_steam = {
         juego["appid"] for juego in datos.get("response", {}).get("games", [])
         if juego.get("playtime_forever", 0) > 0
     } if datos else set()
 
-    # ✅ 3. Unión de juegos que queremos evitar recomendar
+    # 3. Juegos que hay que evitar (carrito + ya jugados)
     appids_evitar = appids_carrito.union(appids_steam)
 
     if not appids_carrito:
         return {"recomendaciones": []}
 
-    # 📊 4. Modelos y matriz
+    # 4. Cargar modelos y datos
     matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
     pca = load("modelo_pca.joblib")
     kmeans = load("modelo_kmeans.joblib")
     columnas_appids = pd.read_pickle("appids_entrenados.pkl")
 
-    # 📌 5. Vector binario del carrito
+    # 5. Crear vector binario del carrito
     vector_usuario = pd.Series(0, index=columnas_appids)
     vector_usuario[list(appids_carrito & set(columnas_appids))] = 1
 
-    # 🔢 6. Cluster del carrito
+    # 6. Reducir y predecir cluster
     vector_reducido = pca.transform([vector_usuario])
     cluster = int(kmeans.predict(vector_reducido)[0])
     print(f"🧠 Carrito asignado al cluster {cluster}")
 
-    # 📁 7. Reglas
+    # 7. Cargar reglas del cluster
     reglas_path = f"reglas_cluster_{cluster}.csv"
     if not Path(reglas_path).exists():
         return {"recomendaciones": []}
-
     reglas = pd.read_csv(reglas_path)
 
-    # 🧠 Eval frozensets si vienen como string
+    # 8. Evaluar frozensets
     if isinstance(reglas['antecedents'].iloc[0], str):
         if reglas['antecedents'].str.startswith('frozenset').any():
             reglas['antecedents'] = reglas['antecedents'].apply(eval)
@@ -748,10 +754,10 @@ async def recomendar_mba_para_carrito(request: Request):
             reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
             reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
 
-    # 🧾 8. Cargar nombres
+    # 9. Nombres de juegos
     nombres_juegos = pd.read_csv("nombres_juegos.csv").set_index("appid")["name"].to_dict()
 
-    # 🧠 9. Reglas aplicables y filtradas
+    # 10. Reglas aplicables y filtradas
     recomendaciones = []
     for _, fila in reglas.iterrows():
         if fila['antecedents'].issubset(appids_carrito) and not fila['consequents'].issubset(appids_evitar):
@@ -762,7 +768,7 @@ async def recomendar_mba_para_carrito(request: Request):
     if not recomendaciones:
         return {"recomendaciones": []}
 
-    # 📦 10. Resultado final único + imagen
+    # 11. Construir respuesta con imagen + descripción
     recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))
     vistos = set()
     resultados = []
@@ -786,6 +792,7 @@ async def recomendar_mba_para_carrito(request: Request):
             break
 
     return {"recomendaciones": resultados}
+
 
 import smtplib
 from email.mime.text import MIMEText
