@@ -14,6 +14,9 @@ import json
 import re
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 from bs4 import BeautifulSoup
+from joblib import load
+from pathlib import Path
+from ast import literal_eval
 
 # ========== CARGAR MODELO SENTIMIENTO ==========
 print("⏳ Cargando modelo de sentimiento...")
@@ -525,6 +528,75 @@ async def detalle_juego(request: Request, appid: int):
     "resumen_sentimiento": resumen_sentimiento
     })
 
+
+@app.get("/api/recomendacionesmba")
+async def recomendar_mba_para_usuario(request: Request):
+    # Paso 1: Obtener juegos del usuario desde la API de Steam
+    steam_id = request.session.get("steam_id")
+    
+    url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json"
+    response = requests.get(url)
+    if response.status_code != 200:
+        print("❌ Error al obtener los juegos del usuario desde la API.")
+        return
+    juegos_usuario = response.json().get("response", {}).get("games", [])
+    appids_usuario = {j["appid"] for j in juegos_usuario if j.get("playtime_forever", 0) > 0}
+
+    if not appids_usuario:
+        print("⚠️ El usuario no tiene juegos jugados.")
+        return
+
+    # Paso 2: Cargar matriz binaria original y modelos
+    matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
+    pca = load("modelo_pca.joblib")
+    kmeans = load("modelo_kmeans.joblib")
+    columnas_appids = pd.read_pickle("appids_entrenados.pkl")
+
+    # Paso 3: Crear vector binario para este usuario
+    vector_usuario = pd.Series(0, index=columnas_appids)
+    vector_usuario[list(appids_usuario & set(columnas_appids))] = 1
+
+    # Paso 4: Reducir y asignar cluster
+    vector_reducido = pca.transform([vector_usuario])
+    cluster = int(kmeans.predict(vector_reducido)[0])
+    print(f"🧠 Usuario asignado al cluster {cluster}")
+
+    # Paso 5: Cargar reglas de asociación
+    reglas_path = f"reglas_cluster_{cluster}.csv"
+    if not Path(reglas_path).exists():
+        print("⚠️ No hay reglas guardadas para este cluster.")
+        return
+
+    reglas = pd.read_csv(reglas_path)
+
+    # Evaluar 'frozenset' correctamente si están en string
+    if isinstance(reglas['antecedents'].iloc[0], str) and reglas['antecedents'].str.startswith('frozenset').any():
+        reglas['antecedents'] = reglas['antecedents'].apply(eval)
+        reglas['consequents'] = reglas['consequents'].apply(eval)
+    elif isinstance(reglas['antecedents'].iloc[0], str):
+        reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
+        reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
+
+    # Paso 6: Cargar nombres de juegos
+    nombres_juegos = pd.read_csv("nombres_juegos.csv").set_index("appid")["name"].to_dict()
+
+    # Paso 7: Filtrar reglas aplicables
+    recomendaciones = []
+    for _, fila in reglas.iterrows():
+        if fila['antecedents'].issubset(appids_usuario) and not fila['consequents'].issubset(appids_usuario):
+            appid = list(fila['consequents'])[0]
+            recomendaciones.append((appid, fila['confidence'], fila['lift']))
+
+    if not recomendaciones:
+        print("🤷 No se encontraron recomendaciones para este usuario.")
+        return
+
+    # Paso 8: Mostrar top recomendaciones con nombres
+    recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))[:10]
+    print("\n🎯 Recomendaciones MBA para el usuario:")
+    for appid, conf, lift in recomendaciones:
+        nombre = nombres_juegos.get(appid, f"(Nombre no encontrado) AppID {appid}")
+        print(f" - {nombre} (AppID {appid}) — Confianza: {conf:.2f}, Lift: {lift:.2f}")
 
 @app.post("/agregar_al_carrito")
 async def agregar_al_carrito(request: Request, appid: int = Form(...)):

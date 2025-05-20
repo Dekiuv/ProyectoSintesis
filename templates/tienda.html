@@ -58,6 +58,9 @@
           </div>
 
         <h2>Gente como tu también ha comprado:</h2>
+        <div id="recomendacionesmba" class="recomendacionesmba">
+          <p>⏳ Cargando recomendaciones...</p>
+        </div>
     </main>
     <footer class="footer">
       <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
@@ -92,6 +95,38 @@
       .catch(err => {
         console.error(err);
         document.getElementById("recomendaciones").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
+      });
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    fetch("/api/recomendacionesmba")
+      .then(response => response.json())
+      .then(data => {
+        const contenedor = document.getElementById("recomendacionesmba");
+        contenedor.innerHTML = ""; // Limpia el "Cargando..."
+
+        if (data.recomendaciones && data.recomendaciones.length > 0) {
+          data.recomendaciones.forEach(juego => {
+            const card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+              <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
+              <div class="info">
+                <h3>${juego.nombre}</h3>
+                <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
+              </div>
+            `;
+            contenedor.appendChild(card);
+          });
+        } else {
+          contenedor.innerHTML = "<p>❌ No se encontraron recomendaciones.</p>";
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("recomendacionesmba").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
       });
   });
 </script>
