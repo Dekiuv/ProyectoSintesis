@@ -684,3 +684,85 @@ async def procesar_compra(request: Request, email: str = Form(...)):
     request.session["carrito"] = []  # Limpia el carrito
     request.session["correo"] = email
     return RedirectResponse("/gracias", status_code=302)
+
+@app.get("/api/recomendacionesmba_carrito")
+async def recomendar_mba_desde_carrito(request: Request):
+    # Paso 1: Obtener juegos del carrito desde la sesión
+    carrito = request.session.get("carrito", [])
+    if not carrito:
+        print("⚠️ El carrito está vacío.")
+        return {"recomendaciones": []}
+
+    appids = {j["appid"] for j in carrito if "appid" in j}
+
+    if not appids:
+        print("⚠️ No hay appids válidos en el carrito.")
+        return {"recomendaciones": []}
+
+    # Paso 2: Cargar matriz y modelos
+    matriz_binaria = pd.read_csv("matriz_binaria_filtrada.csv", index_col=0)
+    pca = load("modelo_pca.joblib")
+    kmeans = load("modelo_kmeans.joblib")
+    columnas_appids = pd.read_pickle("appids_entrenados.pkl")
+
+    # Paso 3: Crear vector binario del usuario
+    appids_validos = appids & set(columnas_appids)
+    if not appids_validos:
+        return {"recomendaciones": []}
+
+    vector_usuario = pd.Series(0, index=columnas_appids)
+    vector_usuario[list(appids_validos)] = 1
+
+    # Paso 4: Asignar cluster
+    vector_reducido = pca.transform([vector_usuario])
+    cluster = int(kmeans.predict(vector_reducido)[0])
+    print(f"🧠 Carrito asignado al cluster {cluster}")
+
+    # Paso 5: Cargar reglas
+    reglas_path = f"reglas_cluster_{cluster}.csv"
+    if not Path(reglas_path).exists():
+        return {"recomendaciones": []}
+
+    reglas = pd.read_csv(reglas_path)
+    if isinstance(reglas['antecedents'].iloc[0], str) and reglas['antecedents'].str.startswith('frozenset').any():
+        reglas['antecedents'] = reglas['antecedents'].apply(eval)
+        reglas['consequents'] = reglas['consequents'].apply(eval)
+    else:
+        reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
+        reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
+
+    # Paso 6: Nombres y filtrado de recomendaciones
+    nombres_juegos = pd.read_csv("nombres_juegos.csv").set_index("appid")["name"].to_dict()
+    recomendaciones = []
+    for _, fila in reglas.iterrows():
+        if fila['antecedents'].issubset(appids_validos) and not fila['consequents'].issubset(appids_validos):
+            appid = list(fila['consequents'])[0]
+            recomendaciones.append((appid, fila['confidence'], fila['lift']))
+
+    if not recomendaciones:
+        return {"recomendaciones": []}
+
+    recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))
+
+    # Paso 7: Añadir datos de los juegos
+    resultados = []
+    vistos = set()
+    for appid, _, _ in recomendaciones:
+        if appid in vistos:
+            continue
+        vistos.add(appid)
+
+        nombre = nombres_juegos.get(appid, f"Juego {appid}")
+        info_extra = obtener_datos_juego(appid)
+
+        resultados.append({
+            "item_id": appid,
+            "nombre": nombre,
+            "imagen": info_extra["imagen"],
+            "descripcion": info_extra["descripcion"]
+        })
+
+        if len(resultados) >= 10:
+            break
+
+    return {"recomendaciones": resultados}
