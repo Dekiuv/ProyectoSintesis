@@ -7,8 +7,12 @@ body {
 
 main.carrito-contenedor {
   padding: 100px 40px 40px;
-  max-width: 900px;
+  max-width: 90%;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 h1, h2 {
@@ -22,6 +26,7 @@ h1, h2 {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  width: 110%;
 }
 
 .carrito-item {
@@ -79,6 +84,9 @@ form[action="/comprar"] {
   align-items: center;
   gap: 20px;
   flex-wrap: wrap;
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: nowrap;
 }
 
 form[action="/comprar"] input[type="email"] {
@@ -86,12 +94,11 @@ form[action="/comprar"] input[type="email"] {
   border-radius: 30px;
   border: none;
   font-size: 16px;
-  width: 100%;
-  max-width: 400px;
+  width: 50%;
+  max-width: 265px;
   background-color: #4a65e5;
   color: white;
   outline: none;
-  margin-left: 270px;
 }
 
 form[action="/comprar"] input[type="email"]::placeholder {
@@ -99,7 +106,7 @@ form[action="/comprar"] input[type="email"]::placeholder {
 }
 
 form[action="/comprar"] button {
-  padding: 12px 24px;
+  padding: 4px 20px;
   border: none;
   border-radius: 30px;
   font-size: 16px;
@@ -108,6 +115,7 @@ form[action="/comprar"] button {
   background-color: #2ecc71;
   color: #1b2838;
   transition: background 0.3s ease;
+  margin-top: 0px;
 }
 
 form[action="/comprar"] button:hover {
@@ -121,7 +129,7 @@ h2:last-of-type {
   font-weight: bold;
 }
 
-    /* Footer */
+/* Footer */
 .footer {
   background-color: #171a21;
   color: white;
