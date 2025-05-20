@@ -35,11 +35,11 @@ templates = Jinja2Templates(directory="templates")
 
 load_dotenv()
 STEAM_KEYS = [
-    # ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
-    ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
-    # ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
-    # ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
+    ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
+    ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
+    ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
+    ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
 ]
 
 # === Cargar modelo de recomendación ===
@@ -405,7 +405,7 @@ def obtener_top_juegos():
     soup = BeautifulSoup(res.text, "lxml")
 
     juegos = []
-    for entry in soup.select(".search_result_row")[:12]:
+    for entry in soup.select(".search_result_row")[:5]:
         nombre = entry.find("span", class_="title").text.strip()
         imagen = entry.find("img")["src"]
         url_juego = entry["href"]
