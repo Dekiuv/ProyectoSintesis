@@ -68,24 +68,19 @@
 <script src="static/header.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const juegosMostrados = new Set();
+  
+    // 🔹 Recomendaciones Word2Vec
     fetch("/api/recomendacionesw2v")
       .then(response => response.json())
       .then(data => {
         const contenedor = document.getElementById("recomendaciones");
-        contenedor.innerHTML = ""; // Limpia el "Cargando..."
-
+        contenedor.innerHTML = "";
+  
         if (data.recomendaciones && data.recomendaciones.length > 0) {
           data.recomendaciones.forEach(juego => {
-            const card = document.createElement("div");
-            card.className = "card";
-
-            card.innerHTML = `
-              <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
-              <div class="info">
-                <h3>${juego.nombre}</h3>
-                <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
-              </div>
-            `;
+            juegosMostrados.add(juego.item_id); // Guardamos el ID
+            const card = crearCard(juego);
             contenedor.appendChild(card);
           });
         } else {
@@ -96,28 +91,18 @@
         console.error(err);
         document.getElementById("recomendaciones").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
       });
-  });
-</script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
+  
+    // 🔸 Recomendaciones MBA (evita duplicados)
     fetch("/api/recomendacionesmba")
       .then(response => response.json())
       .then(data => {
         const contenedor = document.getElementById("recomendacionesmba");
-        contenedor.innerHTML = ""; // Limpia el "Cargando..."
-
+        contenedor.innerHTML = "";
+  
         if (data.recomendaciones && data.recomendaciones.length > 0) {
           data.recomendaciones.forEach(juego => {
-            const card = document.createElement("div");
-            card.className = "card";
-
-            card.innerHTML = `
-              <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
-              <div class="info">
-                <h3>${juego.nombre}</h3>
-                <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
-              </div>
-            `;
+            if (juegosMostrados.has(juego.item_id)) return; // Evitamos duplicados
+            const card = crearCard(juego);
             contenedor.appendChild(card);
           });
         } else {
@@ -128,8 +113,21 @@
         console.error(err);
         document.getElementById("recomendacionesmba").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
       });
+  
+    function crearCard(juego) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
+        <div class="info">
+          <h3>${juego.nombre}</h3>
+          <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
+        </div>
+      `;
+      return card;
+    }
   });
-</script>
+  </script>
 
 </body>
 </html>

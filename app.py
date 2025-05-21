@@ -35,8 +35,8 @@ templates = Jinja2Templates(directory="templates")
 
 load_dotenv()
 STEAM_KEYS = [
-    ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
-    ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
+    # ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
+    # ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
     ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
     ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
@@ -426,13 +426,12 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
                     imagen = info.get("header_image")
                     descripcion = info.get("short_description", None)
 
-                    # Guardar en CSV
-                    nuevos_juegos.append({
+                    # Guardar en el CSV de forma segura usando la función común
+                    actualizar_metadata_juegos([{
                         "appid": appid,
                         "name": nombre,
-                        "imagen_url": imagen,
-                        "descripcion": descripcion
-                    })
+                        "img_icon_url": None  # si tu función lo ignora, no pasa nada
+                    }])
 
                     appid_to_name[appid] = nombre
                     appid_to_img[appid] = imagen
@@ -951,67 +950,110 @@ def enviar_correo_confirmacion(destinatario: str, carrito: list, total: float):
 
 
 
-import pandas as pd
-import requests
 from pathlib import Path
+import pandas as pd
 import csv
 import time
+import requests
 
 METADATA_PATH = Path("data/juegos_metadata.csv")
+OMITIDOS_PATH = Path("data/juegos_omitidos.csv")
 
-def obtener_descripcion_desde_store(appid):
+def obtener_info_completa_desde_store(appid):
     try:
         url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
         res = requests.get(url, timeout=5)
         res.raise_for_status()
         data = res.json().get(str(appid), {}).get("data", {})
-        return data.get("short_description", "")
+        descripcion = data.get("short_description", "").strip()
+        categorias = [c["description"] for c in data.get("categories", [])]
+        return descripcion, "|".join(categorias)
+    except requests.exceptions.HTTPError as e:
+        if res.status_code == 429:
+            print(f"⏳ Petición a {appid} bloqueada por exceso de llamadas (429). Reintenta más tarde.")
+        else:
+            print(f"⚠️ No se pudo obtener info de {appid}: {e}")
+        return None, None
     except Exception as e:
-        print(f"⚠️ No se pudo obtener la descripción de {appid}: {e}")
-        return ""
+        print(f"⚠️ Error inesperado con {appid}: {e}")
+        return None, None
+
+def cargar_omitidos():
+    if OMITIDOS_PATH.exists():
+        df_omitidos = pd.read_csv(OMITIDOS_PATH, dtype=str)
+        return set(df_omitidos["appid"].values)
+    return set()
+
+def guardar_juego_omitido(appid, name):
+    if OMITIDOS_PATH.exists():
+        df_omitidos = pd.read_csv(OMITIDOS_PATH, dtype=str)
+    else:
+        df_omitidos = pd.DataFrame(columns=["appid", "name"])
+
+    if appid not in df_omitidos["appid"].values:
+        nuevo = pd.DataFrame([{"appid": appid, "name": name}])
+        df_omitidos = pd.concat([df_omitidos, nuevo], ignore_index=True)
+        df_omitidos.to_csv(OMITIDOS_PATH, index=False, quoting=csv.QUOTE_ALL)
 
 def actualizar_metadata_juegos(juegos):
-    # Cargar CSV si existe
-    if METADATA_PATH.exists():
-        df_existente = pd.read_csv(METADATA_PATH)
-        df_existente["appid"] = df_existente["appid"].astype(str)
-    else:
-        df_existente = pd.DataFrame(columns=["appid", "name", "imagen_url", "descripcion"])
+    columnas = ["appid", "name", "imagen_url", "descripcion", "categorias"]
 
+    if METADATA_PATH.exists():
+        df_existente = pd.read_csv(METADATA_PATH, dtype=str, quoting=csv.QUOTE_ALL).drop_duplicates("appid", keep="last")
+        for col in columnas:
+            if col not in df_existente.columns:
+                df_existente[col] = ""
+    else:
+        df_existente = pd.DataFrame(columns=columnas)
+
+    omitidos = cargar_omitidos()
     nuevos_registros = []
 
     for juego in juegos:
         appid = str(juego["appid"])
-        ya_guardado = df_existente["appid"] == appid
 
-        if ya_guardado.any():
-            fila = df_existente.loc[ya_guardado].iloc[0]
-            if pd.isna(fila["descripcion"]) or not fila["descripcion"].strip():
-                # actualizar descripción
-                descripcion = obtener_descripcion_desde_store(appid)
-                df_existente.loc[ya_guardado, "descripcion"] = descripcion
+        if appid in omitidos:
+            print(f"⛔ AppID {appid} ya estaba omitido. No se intenta de nuevo.")
+            continue
+
+        if appid in df_existente["appid"].values:
+            fila = df_existente[df_existente["appid"] == appid].iloc[0]
+            if not str(fila.get("descripcion", "")).strip():
+                descripcion, categorias = obtener_info_completa_desde_store(appid)
+                if descripcion:
+                    df_existente.loc[df_existente["appid"] == appid, "descripcion"] = descripcion
+                    df_existente.loc[df_existente["appid"] == appid, "categorias"] = categorias
                 time.sleep(0.5)
-            continue  # Ya está, no hay que volver a añadirlo
+            continue
 
-        # Es nuevo → generar campos y añadir
-        descripcion = obtener_descripcion_desde_store(appid)
+        descripcion, categorias = obtener_info_completa_desde_store(appid)
+        if descripcion is None:
+            continue  # Error temporal → ignorar
+
+        if not descripcion.strip():
+            print(f"⏭️ Juego {appid} omitido por no tener descripción.")
+            guardar_juego_omitido(appid, juego["name"])
+            continue
+
         nuevos_registros.append({
             "appid": appid,
             "name": juego["name"],
             "imagen_url": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg",
-            "descripcion": descripcion
+            "descripcion": descripcion,
+            "categorias": categorias
         })
         time.sleep(0.5)
 
-    # Añadir nuevos al DataFrame existente
     if nuevos_registros:
         df_nuevos = pd.DataFrame(nuevos_registros)
         df_actualizado = pd.concat([df_existente, df_nuevos], ignore_index=True)
+        df_actualizado = df_actualizado.drop_duplicates("appid", keep="last")
     else:
         df_actualizado = df_existente
 
-    # Guardar actualizado
     df_actualizado.to_csv(METADATA_PATH, index=False, quoting=csv.QUOTE_ALL)
+
+
 
 
 
