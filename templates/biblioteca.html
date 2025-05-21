@@ -6,6 +6,31 @@
   <link rel="stylesheet" href="/static/biblioteca.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="icon" href="/static/logo.png" type="image/png">
+  <style>
+    .steam-style {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+
+    .steam-tag {
+      background-color: rgba( 103, 193, 245, 0.2 );
+      border-radius: 3px;
+      color: #67c1f5;
+      font-size: 13px;
+      padding: 3px 8px;
+      font-family: "Motiva Sans", sans-serif;
+      cursor: default;
+      transition: background-color 0.2s ease;
+    }
+
+    .steam-tag:hover {
+      background-color: #3d5a7a;
+      color: white;
+    }
+  </style>
 </head>
 <body>
   <header class="navbar">
@@ -19,14 +44,13 @@
     <div class="usuario" onclick="toggleDropdown()">
       <span class="nombre-usuario">{{ nombre }}</span>
       <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
-
       <div id="dropdownMenu" class="dropdown hidden">
         <button onclick="abrirAmigos(event)">Amigos</button>
         <button onclick="window.location.href='/logout'">Cerrar sesión</button>
       </div>
     </div>
   </header>
-  <!-- PANEL DE AMIGOS (popup lateral derecho) -->
+
   <div id="panel-amigos" class="panel-amigos hidden">
     <div class="panel-header">
       <h3>Amigos</h3>
@@ -55,7 +79,7 @@
         <span class="cerrar" onclick="cerrarModal()">&times;</span>
         <img id="modal-imagen" src="" alt="Imagen del juego">
         <h2 id="modal-nombre"></h2>
-        <p id="modal-categorias"></p>
+        <div id="modal-categorias" class="categorias-container steam-style"></div>
         <p id="modal-descripcion"></p>
         <a id="modal-link" href="" target="_blank" class="ver-mas-btn">Ver en Steam</a>
       </div>
@@ -65,20 +89,88 @@
   <footer class="footer">
     <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
   </footer>
-<script src="static/header.js"></script>
-<script>
 
+  <script src="/static/header.js"></script>
+  <script>
+    async function cargarJuegos() {
+      const loader = document.getElementById("loader");
+      loader.style.display = "block";
+      const contenedor = document.getElementById("juegos-container");
 
-  // Cargar juegos al iniciar
-  async function cargarJuegos() {
-    const loader = document.getElementById("loader");
-    loader.style.display = "block";
-    const contenedor = document.getElementById("juegos-container");
+      try {
+        const res = await fetch("/juegos");
+        const juegos = await res.json();
+        contenedor.innerHTML = "";
+        juegos.forEach(juego => {
+          const card = document.createElement("div");
+          card.className = "juego-card";
+          card.innerHTML = `<img src="${juego.imagen}" alt="${juego.nombre}"><h3>${juego.nombre}</h3>`;
+          card.onclick = () => abrirModal(juego);
+          contenedor.appendChild(card);
+        });
+      } catch (e) {
+        contenedor.innerHTML = "<p style='color:white'>No se pudo cargar la biblioteca.</p>";
+      } finally {
+        loader.style.display = "none";
+      }
+    }
 
-    try {
-      const res = await fetch("/juegos");
+    function abrirModal(juego) {
+      document.getElementById("modal-imagen").src = juego.imagen;
+      document.getElementById("modal-nombre").textContent = juego.nombre;
+      document.getElementById("modal-descripcion").textContent = juego.descripcion;
+
+      const categoriasContainer = document.getElementById("modal-categorias");
+      categoriasContainer.innerHTML = "";
+
+      let categorias = [];
+
+      if (Array.isArray(juego.categorias)) {
+        categorias = juego.categorias;
+      } else if (typeof juego.categorias === "string") {
+        categorias = juego.categorias.split("|").map(c => c.trim()).filter(Boolean);
+      }
+
+      if (categorias.length > 0) {
+        categorias.forEach(cat => {
+          const tag = document.createElement("div");
+          tag.className = "steam-tag";
+          tag.textContent = cat;
+          categoriasContainer.appendChild(tag);
+        });
+      } else {
+        categoriasContainer.textContent = "Sin categorías";
+      }
+
+      document.getElementById("modal-link").href = `/juego/${juego.appid}`;
+      document.getElementById("juego-modal").classList.remove("hidden");
+      document.getElementById("juego-modal").style.display = "flex";
+    }
+
+    function cerrarModal() {
+      const modal = document.getElementById("juego-modal");
+      modal.classList.add("hidden");
+      modal.style.display = "none";
+    }
+
+    document.getElementById("busqueda").addEventListener("input", async function () {
+      const query = this.value.trim();
+      const contenedor = document.getElementById("juegos-container");
+
+      if (query === "") {
+        await cargarJuegos();
+        return;
+      }
+
+      const res = await fetch(`/buscar?q=${encodeURIComponent(query)}`);
       const juegos = await res.json();
       contenedor.innerHTML = "";
+
+      if (juegos.length === 0) {
+        contenedor.innerHTML = `<p style="color:white">No se encontró ningún juego para: <strong>${query}</strong></p>`;
+        return;
+      }
+
       juegos.forEach(juego => {
         const card = document.createElement("div");
         card.className = "juego-card";
@@ -86,61 +178,9 @@
         card.onclick = () => abrirModal(juego);
         contenedor.appendChild(card);
       });
-    } catch (e) {
-      contenedor.innerHTML = "<p style='color:white'>No se pudo cargar la biblioteca.</p>";
-    } finally {
-      loader.style.display = "none";
-    }
-  }
-
-  function abrirModal(juego) {
-    document.getElementById("modal-imagen").src = juego.imagen;
-    document.getElementById("modal-nombre").textContent = juego.nombre;
-    document.getElementById("modal-descripcion").textContent = juego.descripcion;
-    document.getElementById("modal-categorias").textContent = juego.categorias?.join(", ") || "Sin categorías";
-    document.getElementById("modal-link").href = `/juego/${juego.appid}`;
-    document.getElementById("juego-modal").classList.remove("hidden");
-    document.getElementById("juego-modal").style.display = "flex";
-  }
-
-  function cerrarModal() {
-    const modal = document.getElementById("juego-modal");
-    modal.classList.add("hidden");
-    modal.style.display = "none";
-  }
-
-  // Buscar mientras se escribe
-  document.getElementById("busqueda").addEventListener("input", async function () {
-    const query = this.value.trim();
-    const contenedor = document.getElementById("juegos-container");
-
-    if (query === "") {
-      await cargarJuegos();
-      return;
-    }
-
-    const res = await fetch(`/buscar?q=${encodeURIComponent(query)}`);
-    const juegos = await res.json();
-    contenedor.innerHTML = "";
-
-    if (juegos.length === 0) {
-      contenedor.innerHTML = `<p style="color:white">No se encontró ningún juego para: <strong>${query}</strong></p>`;
-      return;
-    }
-
-    juegos.forEach(juego => {
-      const card = document.createElement("div");
-      card.className = "juego-card";
-      card.innerHTML = `<img src="${juego.imagen}" alt="${juego.nombre}"><h3>${juego.nombre}</h3>`;
-      card.onclick = () => abrirModal(juego);
-      contenedor.appendChild(card);
     });
-  });
 
-  window.onload = cargarJuegos;
-  
-  
-
-</script>
+    window.onload = cargarJuegos;
+  </script>
 </body>
 </html>

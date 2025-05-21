@@ -36,7 +36,7 @@ templates = Jinja2Templates(directory="templates")
 load_dotenv()
 STEAM_KEYS = [
     # ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
-    # ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
+    ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
     ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
     ("RAUL", os.getenv("STEAM_API_KEY_RAUL")),
@@ -178,7 +178,7 @@ async def obtener_juegos(request: Request):
                     "nombre": row["name"],
                     "imagen": row["imagen_url"],
                     "descripcion": row["descripcion"],
-                    "categorias": []  # Puedes completar esto más adelante si lo necesitas
+                    "categorias": row.get("categorias", "").split("|") if pd.notna(row.get("categorias", "")) else []
                 })
 
             juegos_cache = juegos_info
