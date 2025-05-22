@@ -86,16 +86,22 @@ def actualizar_metadata_juegos(juegos):
 
 if __name__ == "__main__":
     usuarios_df = pd.read_csv("usuarios_steam_detallado.csv")
+
+    # Calcular cuántos usuarios han jugado cada juego
+    popularidad = usuarios_df.groupby("appid")["user_id"].nunique()
+    juegos_populares = popularidad[popularidad >= 5].index  # 🔥 Ajusta el umbral aquí (por ejemplo: 5)
+
     try:
         metadata_df = pd.read_csv(METADATA_PATH).dropna(subset=["appid"])
         metadata_df["appid"] = metadata_df["appid"].astype(int)
     except FileNotFoundError:
         metadata_df = pd.DataFrame(columns=["appid"])
 
-    appids_usuarios = set(usuarios_df["appid"].unique())
+    appids_usuarios = set(juegos_populares)
     appids_metadata = set(metadata_df["appid"].unique())
     appids_faltantes = list(appids_usuarios - appids_metadata)
-    print(f"🔍 Juegos sin metadata: {len(appids_faltantes)}")
+    print(f"🔍 Juegos populares sin metadata: {len(appids_faltantes)}")
 
     juegos_a_completar = [{"appid": appid, "name": f"Juego {appid}"} for appid in appids_faltantes]
     actualizar_metadata_juegos(juegos_a_completar)
+
