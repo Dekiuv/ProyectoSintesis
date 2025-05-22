@@ -15,20 +15,22 @@ def obtener_info_completa_desde_store(appid):
         res.raise_for_status()
         data = res.json().get(str(appid), {}).get("data", {})
 
+        name = data.get("name", "").strip()
         descripcion = data.get("short_description", "").strip()
         categorias = [c["description"] for c in data.get("categories", [])]
 
-        return descripcion, "|".join(categorias)
+        return name, descripcion, "|".join(categorias)
 
     except requests.exceptions.HTTPError as e:
         if res.status_code == 429:
             print(f"⏳ Petición a {appid} bloqueada por exceso de llamadas (429). Reintenta más tarde.")
         else:
             print(f"⚠️ No se pudo obtener info de {appid}: {e}")
-        return None, None
+        return None, None, None
     except Exception as e:
         print(f"⚠️ Error inesperado con {appid}: {e}")
-        return None, None
+        return None, None, None
+
 
 def cargar_omitidos():
     if OMITIDOS_PATH.exists():
@@ -61,7 +63,7 @@ def actualizar_metadata_juegos(juegos):
         if appid in omitidos or appid in appids_existentes:
             continue
 
-        descripcion, categorias = obtener_info_completa_desde_store(appid)
+        nombre_real, descripcion, categorias = obtener_info_completa_desde_store(appid)
         if descripcion is None:
             continue
 
@@ -72,7 +74,7 @@ def actualizar_metadata_juegos(juegos):
 
         nuevo_registro = pd.DataFrame([{
             "appid": appid,
-            "name": juego["name"],
+            "name": nombre_real,
             "imagen_url": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg",
             "descripcion": descripcion,
             "categorias": categorias
