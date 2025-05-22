@@ -39,12 +39,13 @@
 1. Clona el repositorio:
 
 ```bash
-git clone https://github.com/tuusuario/steamia.git
+git clone https://github.com/Dekiuv/ProyectoSintesis
 cd steamia
 ```
 2. Instala las librerias necesarias
 ```bash
 pip install -r requirements.txt
+pip install git+https://github.com/lyst/lightfm.git
 ```
 
 3. Ejecutar programa
