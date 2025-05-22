@@ -35,7 +35,7 @@ templates = Jinja2Templates(directory="templates")
 
 load_dotenv()
 STEAM_KEYS = [
-    ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
+    # ("DIEGO", os.getenv("STEAM_API_KEY_DIEGO")),
     ("ALVARO", os.getenv("STEAM_API_KEY_ALVARO")),
     ("ARITZ", os.getenv("STEAM_API_KEY_ARITZ")),
     ("VICTOR", os.getenv("STEAM_API_KEY_VICTOR")),
@@ -44,9 +44,7 @@ STEAM_KEYS = [
 
 # === Cargar modelo de recomendación ===
 modelo = Word2Vec.load("word2vec_steam.model")
-df_meta = pd.read_csv("steam_juegos_metadata.csv").fillna("")
-df_meta["appid"] = df_meta["appid"].astype(str)
-metadata_dict = df_meta.set_index("appid").to_dict(orient="index")
+
 
 modelo_nlp = SentenceTransformer("all-MiniLM-L6-v2")
 juegos_cache = []
@@ -178,11 +176,7 @@ async def obtener_juegos(request: Request):
                     "nombre": row["name"],
                     "imagen": row["imagen_url"],
                     "descripcion": row["descripcion"],
-<<<<<<< HEAD
                     "categorias": row.get("categorias", "").split("|") if pd.notna(row.get("categorias", "")) else []
-=======
-                    "categorias": []  # Puedes completar esto más adelante si lo necesitas
->>>>>>> a5598c0 (optimization)
                 })
 
             juegos_cache = juegos_info
@@ -430,22 +424,12 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
                     imagen = info.get("header_image")
                     descripcion = info.get("short_description", None)
 
-<<<<<<< HEAD
                     # Guardar en el CSV de forma segura usando la función común
                     actualizar_metadata_juegos([{
                         "appid": appid,
                         "name": nombre,
                         "img_icon_url": None  # si tu función lo ignora, no pasa nada
                     }])
-=======
-                    # Guardar en CSV
-                    nuevos_juegos.append({
-                        "appid": appid,
-                        "name": nombre,
-                        "imagen_url": imagen,
-                        "descripcion": descripcion
-                    })
->>>>>>> a5598c0 (optimization)
 
                     appid_to_name[appid] = nombre
                     appid_to_img[appid] = imagen
@@ -964,7 +948,6 @@ def enviar_correo_confirmacion(destinatario: str, carrito: list, total: float):
 
 
 
-<<<<<<< HEAD
 from pathlib import Path
 import pandas as pd
 import csv
@@ -975,23 +958,11 @@ METADATA_PATH = Path("data/juegos_metadata.csv")
 OMITIDOS_PATH = Path("data/juegos_omitidos.csv")
 
 def obtener_info_completa_desde_store(appid):
-=======
-import pandas as pd
-import requests
-from pathlib import Path
-import csv
-import time
-
-METADATA_PATH = Path("data/juegos_metadata.csv")
-
-def obtener_descripcion_desde_store(appid):
->>>>>>> a5598c0 (optimization)
     try:
         url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
         res = requests.get(url, timeout=5)
         res.raise_for_status()
         data = res.json().get(str(appid), {}).get("data", {})
-<<<<<<< HEAD
         descripcion = data.get("short_description", "").strip()
         categorias = [c["description"] for c in data.get("categories", [])]
         return descripcion, "|".join(categorias)
@@ -1034,26 +1005,10 @@ def actualizar_metadata_juegos(juegos):
         df_existente = pd.DataFrame(columns=columnas)
 
     omitidos = cargar_omitidos()
-=======
-        return data.get("short_description", "")
-    except Exception as e:
-        print(f"⚠️ No se pudo obtener la descripción de {appid}: {e}")
-        return ""
-
-def actualizar_metadata_juegos(juegos):
-    # Cargar CSV si existe
-    if METADATA_PATH.exists():
-        df_existente = pd.read_csv(METADATA_PATH)
-        df_existente["appid"] = df_existente["appid"].astype(str)
-    else:
-        df_existente = pd.DataFrame(columns=["appid", "name", "imagen_url", "descripcion"])
-
->>>>>>> a5598c0 (optimization)
     nuevos_registros = []
 
     for juego in juegos:
         appid = str(juego["appid"])
-<<<<<<< HEAD
 
         if appid in omitidos:
             print(f"⛔ AppID {appid} ya estaba omitido. No se intenta de nuevo.")
@@ -1078,26 +1033,10 @@ def actualizar_metadata_juegos(juegos):
             guardar_juego_omitido(appid, juego["name"])
             continue
 
-=======
-        ya_guardado = df_existente["appid"] == appid
-
-        if ya_guardado.any():
-            fila = df_existente.loc[ya_guardado].iloc[0]
-            if pd.isna(fila["descripcion"]) or not fila["descripcion"].strip():
-                # actualizar descripción
-                descripcion = obtener_descripcion_desde_store(appid)
-                df_existente.loc[ya_guardado, "descripcion"] = descripcion
-                time.sleep(0.5)
-            continue  # Ya está, no hay que volver a añadirlo
-
-        # Es nuevo → generar campos y añadir
-        descripcion = obtener_descripcion_desde_store(appid)
->>>>>>> a5598c0 (optimization)
         nuevos_registros.append({
             "appid": appid,
             "name": juego["name"],
             "imagen_url": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg",
-<<<<<<< HEAD
             "descripcion": descripcion,
             "categorias": categorias
         })
@@ -1110,30 +1049,13 @@ def actualizar_metadata_juegos(juegos):
     else:
         df_actualizado = df_existente
 
-=======
-            "descripcion": descripcion
-        })
-        time.sleep(0.5)
-
-    # Añadir nuevos al DataFrame existente
-    if nuevos_registros:
-        df_nuevos = pd.DataFrame(nuevos_registros)
-        df_actualizado = pd.concat([df_existente, df_nuevos], ignore_index=True)
-    else:
-        df_actualizado = df_existente
-
-    # Guardar actualizado
->>>>>>> a5598c0 (optimization)
     df_actualizado.to_csv(METADATA_PATH, index=False, quoting=csv.QUOTE_ALL)
 
 
 
 
-<<<<<<< HEAD
 
 
-=======
->>>>>>> a5598c0 (optimization)
 def obtener_juegos_usuario_desde_csv(appids_usuario):
     df = pd.read_csv("datos/juegos_metadata.csv")
     return df[df["appid"].isin(appids_usuario)].to_dict(orient="records")
