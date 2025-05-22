@@ -8,28 +8,39 @@ from tqdm import tqdm
 METADATA_PATH = Path("data/juegos_metadata.csv")
 OMITIDOS_PATH = Path("data/juegos_omitidos.csv")
 
-def obtener_info_completa_desde_store(appid):
-    try:
-        url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
-        res = requests.get(url, timeout=5)
-        res.raise_for_status()
-        data = res.json().get(str(appid), {}).get("data", {})
+def obtener_info_completa_desde_store(appid, max_reintentos=10):
+    intentos = 0
+    while intentos < max_reintentos:
+        try:
+            url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
+            res = requests.get(url, timeout=5)
+            if res.status_code == 429:
+                espera = 60 + intentos * 10
+                print(f"⏳ Petición a {appid} bloqueada (429). Esperando {espera} segundos antes de reintentar...")
+                time.sleep(espera)
+                intentos += 1
+                continue
 
-        name = data.get("name", "").strip()
-        descripcion = data.get("short_description", "").strip()
-        categorias = [c["description"] for c in data.get("categories", [])]
+            res.raise_for_status()
+            data = res.json().get(str(appid), {}).get("data", {})
 
-        return name, descripcion, "|".join(categorias)
+            name = data.get("name", "").strip()
+            descripcion = data.get("short_description", "").strip()
+            categorias = [c["description"] for c in data.get("categories", [])]
 
-    except requests.exceptions.HTTPError as e:
-        if res.status_code == 429:
-            print(f"⏳ Petición a {appid} bloqueada por exceso de llamadas (429). Reintenta más tarde.")
-        else:
-            print(f"⚠️ No se pudo obtener info de {appid}: {e}")
-        return None, None, None
-    except Exception as e:
-        print(f"⚠️ Error inesperado con {appid}: {e}")
-        return None, None, None
+            return name, descripcion, "|".join(categorias)
+
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Error en appid {appid}: {e}. Reintentando...")
+            time.sleep(5)
+            intentos += 1
+        except Exception as e:
+            print(f"⚠️ Error inesperado con {appid}: {e}")
+            break
+
+    print(f"❌ No se pudo obtener info de {appid} tras {max_reintentos} intentos.")
+    return None, None, None
+
 
 
 def cargar_omitidos():
