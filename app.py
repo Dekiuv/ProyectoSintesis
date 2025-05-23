@@ -43,7 +43,7 @@ STEAM_KEYS = [
 ]
 
 # === Cargar modelo de recomendación ===
-modelo = Word2Vec.load("word2vec_steam.model")
+modelo = Word2Vec.load("word2vec_steam_semantico.model")
 
 
 modelo_nlp = SentenceTransformer("all-MiniLM-L6-v2")
@@ -352,7 +352,11 @@ async def api_recomendaciones(request: Request):
     return JSONResponse(content={"recomendaciones": recomendaciones})
 
 
-def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_usuario=None, topn=30):
+from pathlib import Path
+import requests
+import pandas as pd
+
+def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_usuario=None, palabras_clave=None, topn=30):
     METADATA_PATH = Path("data/juegos_metadata.csv")
     metadata_df = pd.read_csv(METADATA_PATH).dropna()
     metadata_df["appid"] = metadata_df["appid"].astype(str)
@@ -361,12 +365,11 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
     appid_to_img = metadata_df.set_index("appid")["imagen_url"].to_dict()
     appids_csv = set(appid_to_name.keys())
 
-    # Paso 1: Obtener appids del usuario
-    if appids_usuario:
-        print("✅ Usando appids_usuario desde sesión")
-        appids = [str(a) for a in appids_usuario if isinstance(a, (int, str))]
-    else:
-        appids = []
+    claves_validas = []
+
+    # === Obtener juegos del usuario si no se pasan desde sesión ===
+    if appids_usuario is None:
+        appids_usuario = []
         for nombre, clave in STEAM_KEYS:
             if not clave:
                 continue
@@ -382,64 +385,72 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
                 )
                 response.raise_for_status()
                 juegos_usuario = response.json().get("response", {}).get("games", [])
-                appids = [str(j["appid"]) for j in juegos_usuario if j.get("playtime_forever", 0) > 0]
+                appids_usuario = [str(j["appid"]) for j in juegos_usuario if j.get("playtime_forever", 0) > 0]
                 break
             except Exception:
                 continue
-        if not appids:
-            return [], [], "❌ No se pudieron obtener los juegos del usuario."
 
-    # Paso 2: Filtrar appids válidos
-    appids_validos = [a for a in appids if a in modelo.wv.key_to_index]
-    ignorados = len(appids) - len(appids_validos)
-    jugados_nombres = [appid_to_name.get(a, f"Unknown ({a})") for a in appids_validos]
+    if not appids_usuario and not palabras_clave:
+        return [], [], "⚠️ No se proporcionaron juegos ni palabras clave."
 
-    if not appids_validos:
-        return jugados_nombres, [], "⚠️ Ningún juego jugado está en el vocabulario del modelo."
+    # === Mezclar appids y palabras clave ===
+    appids_usuario = [str(a) for a in appids_usuario if isinstance(a, (int, str))]
+    palabras_clave = palabras_clave or []
+    todas_entradas = appids_usuario + palabras_clave
 
-    # Paso 3: Generar recomendaciones
+    claves_validas = [k for k in todas_entradas if k in modelo.wv.key_to_index]
+    ignorados = len(todas_entradas) - len(claves_validas)
+
+    jugados_nombres = [appid_to_name.get(k, k) for k in claves_validas if k.isdigit()]
+
+    if not claves_validas:
+        return jugados_nombres, [], "⚠️ Ningún término válido encontrado en el modelo."
+
+    # === Generar recomendaciones ===
     try:
-        recomendaciones = modelo.wv.most_similar(appids_validos, topn=topn * 2)
+        recomendaciones = modelo.wv.most_similar(claves_validas, topn=topn * 2)
         recomendados = []
-        nuevos_juegos = []
 
-        for appid, similitud in recomendaciones:
-            if appid in appids_validos:
+        print("🔍 Recomendaciones (similitud):")
+        for clave, similitud in recomendaciones:
+            if clave in claves_validas:
                 continue
 
-            if appid in appid_to_name:
-                nombre = appid_to_name.get(appid)
-                imagen = appid_to_img.get(appid)
-                descripcion = None
-            else:
-                # Obtener desde la Steam Store
+            if not clave.isdigit():
+                print(f"🔤 '{clave}' es una palabra, no se recomienda como juego.")
+                continue
+
+            nombre = appid_to_name.get(clave)
+            imagen = appid_to_img.get(clave)
+            descripcion = None
+
+            if not nombre:
                 try:
-                    url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
+                    url = f"https://store.steampowered.com/api/appdetails?appids={clave}&l=spanish"
                     res = requests.get(url, timeout=5)
                     res.raise_for_status()
-                    datos = res.json()
-                    info = datos.get(str(appid), {}).get("data", {})
+                    datos = res.json().get(str(clave), {}).get("data", {})
+                    nombre = datos.get("name", f"Juego {clave}")
+                    imagen = datos.get("header_image")
+                    descripcion = datos.get("short_description", "")
 
-                    nombre = info.get("name", f"Juego {appid}")
-                    imagen = info.get("header_image")
-                    descripcion = info.get("short_description", None)
-
-                    # Guardar en el CSV de forma segura usando la función común
                     actualizar_metadata_juegos([{
-                        "appid": appid,
+                        "appid": clave,
                         "name": nombre,
-                        "img_icon_url": None  # si tu función lo ignora, no pasa nada
+                        "img_icon_url": None
                     }])
 
-                    appid_to_name[appid] = nombre
-                    appid_to_img[appid] = imagen
+                    appid_to_name[clave] = nombre
+                    appid_to_img[clave] = imagen
 
                 except Exception as e:
-                    print(f"⚠️ No se pudo obtener info del juego {appid}: {e}")
+                    print(f"⚠️ No se pudo obtener info de {clave}: {e}")
                     continue
 
+            print(f"📌 {nombre} (appid {clave}) - similitud: {round(similitud, 4)}")
+
             recomendados.append({
-                "item_id": int(appid),
+                "item_id": int(clave),
                 "nombre": nombre,
                 "score": round(similitud, 4),
                 "metacritic": None,
@@ -450,18 +461,16 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
             if len(recomendados) >= topn:
                 break
 
-        # Paso 4: Guardar nuevos juegos en el CSV
-        if nuevos_juegos:
-            nuevos_df = pd.DataFrame(nuevos_juegos)
-            nuevos_df.to_csv(METADATA_PATH, mode="a", header=False, index=False)
-
     except Exception as e:
-        return jugados_nombres, [], f"❌ Error al generar recomendaciones: {e}"
+        return jugados_nombres, [], f"❌ Error generando recomendaciones: {e}"
 
     mensaje = "✅ Recomendaciones generadas correctamente"
     if ignorados > 0:
-        mensaje += f" (⚠️ {ignorados} juegos ignorados por no estar en el modelo)"
+        mensaje += f" (⚠️ {ignorados} entradas ignoradas por no estar en el modelo)"
+
     return jugados_nombres, recomendados, mensaje
+
+
 
 
 
