@@ -2,12 +2,10 @@ import pandas as pd
 import requests
 import time
 from pathlib import Path
-from tqdm import tqdm
 import csv
+from tqdm import tqdm
 
 METADATA_PATH = Path("data/juegos_metadata.csv")
-OMITIDOS_PATH = Path("data/juegos_omitidos.csv")
-
 COLUMNAS = ["appid", "name", "imagen_url", "descripcion", "categorias", "precio", "fecha_lanzamiento"]
 
 def obtener_info_completa_desde_store(appid, max_reintentos=10):
@@ -16,9 +14,10 @@ def obtener_info_completa_desde_store(appid, max_reintentos=10):
         try:
             url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=spanish"
             res = requests.get(url, timeout=5)
+
             if res.status_code == 429:
                 espera = 60 + intentos * 10
-                print(f"⏳ 429 para {appid}. Esperando {espera} segundos...")
+                print(f"⏳ 429 bloqueado ({appid}). Esperando {espera} segundos...")
                 time.sleep(espera)
                 intentos += 1
                 continue
@@ -34,7 +33,7 @@ def obtener_info_completa_desde_store(appid, max_reintentos=10):
             imagen_url = data.get("header_image", "")
             fecha = data.get("release_date", {}).get("date", "").strip()
 
-            # Extraer precio
+            # Precio
             precio_info = data.get("price_overview")
             if precio_info:
                 precio_str = precio_info.get("final_formatted", "0")
@@ -43,10 +42,9 @@ def obtener_info_completa_desde_store(appid, max_reintentos=10):
                 else:
                     precio = float(precio_str.replace("€", "").replace(",", ".").strip())
             else:
-                precio = 0.0  # si no hay info, consideramos gratis
+                precio = 0.0
 
             return {
-                "appid": str(appid),
                 "name": nombre,
                 "imagen_url": imagen_url,
                 "descripcion": descripcion,
@@ -60,39 +58,32 @@ def obtener_info_completa_desde_store(appid, max_reintentos=10):
             time.sleep(5)
             intentos += 1
         except Exception as e:
-            print(f"⚠️ Error inesperado en {appid}: {e}")
+            print(f"⚠️ Error inesperado con {appid}: {e}")
             break
 
     print(f"❌ No se pudo obtener info de {appid} tras {max_reintentos} intentos.")
     return None
 
-def actualizar_metadata_juegos(juegos):
-    # Cargar metadata actual
-    if METADATA_PATH.exists():
-        df_existente = pd.read_csv(METADATA_PATH, dtype=str)
-    else:
-        df_existente = pd.DataFrame(columns=COLUMNAS)
+def actualizar_solo_existentes():
+    if not METADATA_PATH.exists():
+        print("❌ El archivo metadata no existe.")
+        return
 
-    df_existente["appid"] = df_existente["appid"].astype(str)
-    df_existente = df_existente.set_index("appid")
+    df = pd.read_csv(METADATA_PATH, dtype=str)
+    df["appid"] = df["appid"].astype(str)
+    df = df.set_index("appid")
 
-    for juego in tqdm(juegos, desc="📥 Actualizando metadata"):
-        appid = str(juego["appid"])
+    for appid in tqdm(df.index, desc="🔄 Actualizando juegos ya existentes"):
         nueva_info = obtener_info_completa_desde_store(appid)
         if nueva_info is None:
             continue
 
-        # Añadir o actualizar la fila
-        df_existente.loc[appid] = nueva_info
+        for col, valor in nueva_info.items():
+            df.at[appid, col] = valor
 
-        # Guardar tras cada actualización (seguridad)
-        df_existente.reset_index().to_csv(METADATA_PATH, index=False, quoting=csv.QUOTE_ALL)
-
-        time.sleep(0.5)  # evitar bloqueos por abuso
+        # Guardar tras cada juego
+        df.reset_index().to_csv(METADATA_PATH, index=False, quoting=csv.QUOTE_ALL)
+        time.sleep(0.5)
 
 if __name__ == "__main__":
-    usuarios_df = pd.read_csv("usuarios_steam_detallado.csv")
-    appids = usuarios_df["appid"].astype(str).unique()
-    juegos_a_actualizar = [{"appid": a, "name": f"Juego {a}"} for a in appids]
-
-    actualizar_metadata_juegos(juegos_a_actualizar)
+    actualizar_solo_existentes()
