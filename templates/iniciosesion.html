@@ -25,7 +25,12 @@
       {% endif %}
 
       <form action="/login" method="post">
-        <input type="text" id="steam_id" name="steam_id" placeholder="Ejemplo: 76561198373413082" required minlength="17" maxlength="17" pattern="\d{17}" title="Introduce exactamente 17 dígitos numéricos"/>
+        <input type="text" id="steam_id" name="steam_input"
+          placeholder="Ejemplo: 76561198373413082 o alvaro_1337"
+          required
+          pattern="^[a-zA-Z0-9_]{2,32}$"
+          title="Introduce tu Steam ID numérico de 17 dígitos o tu Vanity URL (nombre personalizado de Steam)"/>
+
         <div class="login-abajo">
           <!-- Botón para mostrar el popup -->
           <button type="button" class="ayuda-steamid-btn" onclick="abrirPopup()">¿Dónde encuentro mi Steam ID?</button>

@@ -367,3 +367,58 @@ main {
 .estrella-review {
   width: 100px;
 }
+
+.recomendaciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.recomendaciones .card {
+  width: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+  background-color: white;
+  text-align: center;
+}
+
+.recomendaciones .card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-bottom: 1px solid #ddd;
+}
+
+.recomendaciones .card .info {
+  padding: 0.8rem;
+}
+
+.recomendaciones .card h3 {
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.recomendaciones .card .comprar-btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+}
+
+.recomendaciones .card .comprar-btn:hover {
+  background-color: #005fa3;
+}
+
+.recomendaciones .card:hover {
+  transform: translateY(-4px);
+}

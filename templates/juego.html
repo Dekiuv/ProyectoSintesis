@@ -1,11 +1,80 @@
-<!DOCTYPE html>
-<html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Steamia | {{ juego.nombre }}</title>
   <link rel="stylesheet" href="/static/juego.css">
   <link rel="icon" href="/static/logo.png" type="image/png">
+
+  <style>
+    .recomendaciones {
+      display: flex;
+      flex-wrap: nowrap; /* 👈 NO permitir que bajen de línea */
+      gap: 1.5rem;
+      overflow-x: auto; /* 👈 Scroll si no caben */
+      padding: 1rem 0;
+      scrollbar-width: thin;
+    }
+  
+    .recomendaciones::-webkit-scrollbar {
+      height: 8px;
+    }
+  
+    .recomendaciones::-webkit-scrollbar-thumb {
+      background-color: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+  
+    .recomendaciones .card {
+      min-width: 200px;
+      flex: 0 0 auto; /* 👈 que no se encojan ni expandan */
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: transform 0.2s;
+      background-color: #2a475e;
+      text-align: center;
+    }
+  
+    .recomendaciones .card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-bottom: 1px solid #ddd;
+    }
+  
+    .recomendaciones .card .info {
+      padding: 0.8rem;
+    }
+  
+    .recomendaciones .card h3 {
+      font-size: 1rem;
+      margin: 0.5rem 0;
+      color: #fff;
+    }
+  
+    .recomendaciones .card .comprar-btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.8rem;
+      background-color: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: background-color 0.3s;
+    }
+  
+    .recomendaciones .card .comprar-btn:hover {
+      background-color: #005fa3;
+    }
+  
+    .recomendaciones .card:hover {
+      transform: translateY(-4px);
+    }
+  </style>
+  
 </head>
+
 <body>
   <header class="navbar">
     <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
@@ -52,8 +121,9 @@
 
     <section class="recomendacion">
       <h2>Gente que ha comprado <b>{{ juego.nombre }}</b> también ha comprado</h2>
-      <!-- Aquí pondrás recomendaciones más adelante -->
-    </section>
+      <div id="recomendaciones-mba-juego" class="recomendaciones">
+        <p>⏳ Cargando recomendaciones...</p>
+      </div>    </section>
 
     <section class="reviews">
       <h2>Reseñas de usuarios
@@ -81,5 +151,40 @@
 </footer>
 
   <script src="/static/header.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const appid = "{{ juego.appid }}";
+  
+      fetch(`/api/recomendacionesmba_carrito?extra_appid=${appid}`)
+        .then(response => response.json())
+        .then(data => {
+          const contenedor = document.getElementById("recomendaciones-mba-juego");
+          contenedor.innerHTML = "";
+  
+          if (data.recomendaciones && data.recomendaciones.length > 0) {
+            data.recomendaciones.forEach(juego => {
+              const card = document.createElement("div");
+              card.className = "card";
+  
+              card.innerHTML = `
+                <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
+                <div class="info">
+                  <h3>${juego.nombre}</h3>
+                  <a href="/juego/${juego.item_id}" class="comprar-btn">Ver juego</a>
+                </div>
+              `;
+              contenedor.appendChild(card);
+            });
+          } else {
+            contenedor.innerHTML = "<p>❌ No se encontraron recomendaciones para este juego.</p>";
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById("recomendaciones-mba-juego").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
+        });
+    });
+  </script>
+  
 </body>
 </html>

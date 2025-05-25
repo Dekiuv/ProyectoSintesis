@@ -85,15 +85,44 @@ async def login_form(request: Request):
 async def debug_session(request: Request):
     return JSONResponse(content=dict(request.session))
 
-@app.post("/login")
-async def login(request: Request, steam_id: str = Form(...)):
-    print("🧪 steam_id recibido:", steam_id)
+from fastapi import Form, Request
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
 
+templates = Jinja2Templates(directory="templates")
+
+@app.post("/login")
+async def login(request: Request, steam_input: str = Form(...)):
+    print("🧪 Valor introducido por el usuario:", steam_input)
+
+    # 👉 Paso 1: Resolver vanity URL si no es numérico
+    if not steam_input.isdigit():
+        res = llamar_api_steam(
+            "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/",
+            {"vanityurl": steam_input}
+        )
+        print("🔍 Resolviendo vanity URL:", res)
+
+        if not res or res.get("response", {}).get("success") != 1:
+            return templates.TemplateResponse(
+                "iniciosesion.html",
+                {"request": request, "error": "❌ Vanity URL no válida o no encontrada."},
+                status_code=400
+            )
+
+        steam_id = res["response"]["steamid"]
+    else:
+        steam_id = steam_input
+
+    print("🆔 Steam ID resuelto:", steam_id)
+
+    # 👉 Paso 2: Obtener juegos del usuario
     datos = llamar_api_steam(
         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/",
         {"steamid": steam_id, "include_appinfo": "true"}
     )
-    # print("📦 Respuesta de GetOwnedGames:", datos)
+    print("📦 Respuesta de GetOwnedGames:", datos)
 
     if not datos or not datos.get("response") or datos["response"].get("game_count", 0) == 0:
         return templates.TemplateResponse(
@@ -103,13 +132,10 @@ async def login(request: Request, steam_id: str = Form(...)):
         )
 
     juegos = datos["response"].get("games", [])
-    
-    # ✅ Guardamos metadata en CSV
+    request.session["appids_usuario"] = [j["appid"] for j in juegos]
     actualizar_metadata_juegos(juegos)
 
-    # ✅ Guardamos solo appids en la sesión
-    request.session["appids_usuario"] = [j["appid"] for j in juegos]
-
+    # 👉 Paso 3: Obtener perfil
     perfil_res = llamar_api_steam(
         "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/",
         {"steamids": steam_id}
@@ -123,16 +149,12 @@ async def login(request: Request, steam_id: str = Form(...)):
         )
 
     jugador = perfil_res["response"]["players"][0]
-    avatar = jugador.get("avatarfull", "")
-    nombre = jugador.get("personaname", "Usuario")
-
-    # ✅ Guardar info de sesión
     request.session["steam_id"] = steam_id
-    request.session["avatar"] = avatar
-    request.session["nombre"] = nombre
+    request.session["avatar"] = jugador.get("avatarfull", "")
+    request.session["nombre"] = jugador.get("personaname", "Usuario")
 
-    # ✅ Redirigir
     return RedirectResponse(url="/tienda", status_code=302)
+
 
 
 @app.get("/logout")
@@ -355,7 +377,6 @@ async def api_recomendaciones(request: Request):
 from pathlib import Path
 import requests
 import pandas as pd
-
 def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_usuario=None, palabras_clave=None, topn=30):
     METADATA_PATH = Path("data/juegos_metadata.csv")
     metadata_df = pd.read_csv(METADATA_PATH).dropna()
@@ -365,15 +386,15 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
     appid_to_img = metadata_df.set_index("appid")["imagen_url"].to_dict()
     appids_csv = set(appid_to_name.keys())
 
-    claves_validas = []
-
     # === Obtener juegos del usuario si no se pasan desde sesión ===
     if appids_usuario is None:
+        print("📥 No hay appids en sesión, accediendo a Steam API...")
         appids_usuario = []
         for nombre, clave in STEAM_KEYS:
             if not clave:
                 continue
             try:
+                print(f"🔑 Probando con clave de {nombre}...")
                 response = requests.get(
                     "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
                     params={
@@ -386,11 +407,14 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
                 response.raise_for_status()
                 juegos_usuario = response.json().get("response", {}).get("games", [])
                 appids_usuario = [str(j["appid"]) for j in juegos_usuario if j.get("playtime_forever", 0) > 0]
+                print(f"✅ Obtenidos {len(appids_usuario)} juegos del usuario.")
                 break
-            except Exception:
+            except Exception as e:
+                print(f"❌ Error con clave de {nombre}: {e}")
                 continue
 
     if not appids_usuario and not palabras_clave:
+        print("⚠️ No se han proporcionado juegos ni palabras clave.")
         return [], [], "⚠️ No se proporcionaron juegos ni palabras clave."
 
     # === Mezclar appids y palabras clave ===
@@ -398,12 +422,16 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
     palabras_clave = palabras_clave or []
     todas_entradas = appids_usuario + palabras_clave
 
+    print(f"🧪 Entradas originales: {todas_entradas}")
     claves_validas = [k for k in todas_entradas if k in modelo.wv.key_to_index]
     ignorados = len(todas_entradas) - len(claves_validas)
+    print(f"✅ Claves válidas en el modelo: {claves_validas}")
+    print(f"⚠️ {ignorados} claves ignoradas por no estar en el modelo.")
 
     jugados_nombres = [appid_to_name.get(k, k) for k in claves_validas if k.isdigit()]
 
     if not claves_validas:
+        print("❌ Ninguna clave válida encontrada.")
         return jugados_nombres, [], "⚠️ Ningún término válido encontrado en el modelo."
 
     # === Generar recomendaciones ===
@@ -426,6 +454,7 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
 
             if not nombre:
                 try:
+                    print(f"🌐 Consultando info de Steam Store para appid {clave}...")
                     url = f"https://store.steampowered.com/api/appdetails?appids={clave}&l=spanish"
                     res = requests.get(url, timeout=5)
                     res.raise_for_status()
@@ -462,13 +491,16 @@ def recomendar_juegos_word2vec_con_nombres_unificado(modelo, steam_id, appids_us
                 break
 
     except Exception as e:
+        print(f"❌ Error generando recomendaciones: {e}")
         return jugados_nombres, [], f"❌ Error generando recomendaciones: {e}"
 
     mensaje = "✅ Recomendaciones generadas correctamente"
     if ignorados > 0:
         mensaje += f" (⚠️ {ignorados} entradas ignoradas por no estar en el modelo)"
 
+    print(mensaje)
     return jugados_nombres, recomendados, mensaje
+
 
 
 
@@ -821,16 +853,22 @@ async def procesar_compra(request: Request, email: str = Form(...)):
     return RedirectResponse("/gracias", status_code=302)
 
 
+from fastapi import Request, Query
+
 @app.get("/api/recomendacionesmba_carrito")
-async def recomendar_mba_para_carrito(request: Request):
-    # 1. Obtener juegos del carrito desde la sesión
+async def recomendar_mba_para_carrito(request: Request, extra_appid: str = Query(None)):
+    # 1. Obtener juegos del carrito
     carrito = request.session.get("carrito", [])
     appids_carrito = {j["appid"] for j in carrito}
+
+    # ✅ Añadir juego extra si se ha proporcionado
+    if extra_appid and extra_appid.isdigit():
+        appids_carrito.add(int(extra_appid))
 
     if not appids_carrito:
         return {"recomendaciones": []}
 
-    # 2. Obtener juegos jugados por el usuario desde la sesión o la API
+    # 2. Obtener juegos jugados por el usuario
     steam_id = request.session.get("steam_id")
     appids_usuario = request.session.get("appids_usuario")
 
@@ -855,22 +893,20 @@ async def recomendar_mba_para_carrito(request: Request):
     kmeans = load("modelo_kmeans.joblib")
     columnas_appids = pd.read_pickle("appids_entrenados.pkl")
 
-    # 4. Crear vector binario del usuario (basado en sus juegos jugados)
+    # 4. Crear vector binario y cluster
     vector_usuario = pd.Series(0, index=columnas_appids)
     vector_usuario[list(appids_usuario & set(columnas_appids))] = 1
 
-    # 5. Reducir y predecir cluster del usuario
     vector_reducido = pca.transform([vector_usuario])
     cluster = int(kmeans.predict(vector_reducido)[0])
     print(f"🧠 Usuario asignado al cluster {cluster}")
 
-    # 6. Cargar reglas del cluster
+    # 5. Cargar reglas
     reglas_path = f"reglas_cluster_{cluster}.csv"
     if not Path(reglas_path).exists():
         return {"recomendaciones": []}
     reglas = pd.read_csv(reglas_path)
 
-    # 7. Evaluar frozensets
     if isinstance(reglas['antecedents'].iloc[0], str):
         if reglas['antecedents'].str.startswith('frozenset').any():
             reglas['antecedents'] = reglas['antecedents'].apply(eval)
@@ -879,12 +915,12 @@ async def recomendar_mba_para_carrito(request: Request):
             reglas['antecedents'] = reglas['antecedents'].apply(lambda x: frozenset(literal_eval(x)))
             reglas['consequents'] = reglas['consequents'].apply(lambda x: frozenset(literal_eval(x)))
 
-    # 8. Cargar metadata local
+    # 6. Cargar metadata
     metadata_df = pd.read_csv("data/juegos_metadata.csv").dropna()
     metadata_df["appid"] = metadata_df["appid"].astype(int)
     metadata_dict = metadata_df.set_index("appid").to_dict(orient="index")
 
-    # 9. Aplicar reglas con base en los juegos del carrito
+    # 7. Aplicar reglas
     recomendaciones = []
     for _, fila in reglas.iterrows():
         if fila['antecedents'].issubset(appids_carrito) and not fila['consequents'].issubset(appids_evitar):
@@ -895,7 +931,7 @@ async def recomendar_mba_para_carrito(request: Request):
     if not recomendaciones:
         return {"recomendaciones": []}
 
-    # 10. Construir respuesta
+    # 8. Construir respuesta
     recomendaciones = sorted(recomendaciones, key=lambda x: (-x[1], -x[2]))
     vistos = set()
     resultados = []
@@ -907,7 +943,7 @@ async def recomendar_mba_para_carrito(request: Request):
 
         info = metadata_dict.get(appid)
         if not info:
-            continue  # saltar si no está en el CSV
+            continue
 
         resultados.append({
             "item_id": appid,
@@ -920,6 +956,7 @@ async def recomendar_mba_para_carrito(request: Request):
             break
 
     return {"recomendaciones": resultados}
+
 
 
 

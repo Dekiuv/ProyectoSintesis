@@ -12,23 +12,28 @@ stopwords_es = set(stopwords.words("spanish"))
 stopwords_en = set(stopwords.words("english"))
 
 # === Parámetros de limpieza ===
-TIEMPO_MIN_JUGADO = 120
+TIEMPO_MIN_JUGADO = 60
 TIEMPO_ULTIMAS_2_SEMANAS = 120
 MIN_USUARIOS_POR_JUEGO = 100
-MIN_JUEGOS_POR_USUARIO = 3
+MIN_JUEGOS_POR_USUARIO = 5
 
 # === AppIDs equivalentes ===
 EQUIVALENCIAS_APPIDS = {
     "3240220": "271590",  # GTA V Enhanced → Legacy
+    "476620": "476600",  # Call Of duty WWII
 }
 
 # === Cargar datasets ===
 df_usuarios = pd.read_csv("usuarios_steam_detallado.csv")
-df_meta = pd.read_csv("data/juegos_metadata.csv").dropna(subset=["descripcion"])
+df_meta = pd.read_csv("data/juegos_metadata.csv").dropna(subset=["descripcion", "precio"])
 
 # Convertir a string y normalizar equivalencias
 df_usuarios["appid"] = df_usuarios["appid"].astype(str).replace(EQUIVALENCIAS_APPIDS)
 df_meta["appid"] = df_meta["appid"].astype(str).replace(EQUIVALENCIAS_APPIDS)
+
+# ✅ Convertir precio a numérico y filtrar juegos con precio > 0
+df_meta["precio"] = pd.to_numeric(df_meta["precio"], errors="coerce").fillna(0)
+df_meta = df_meta[df_meta["precio"] > 0]
 
 # === Eliminar juegos problemáticos ===
 JUEGOS_EXCLUIDOS = {"1366800", "629520", "438100", "431960", "2507950", "1281930", "714010"}
@@ -77,16 +82,7 @@ df_meta["categorias"] = df_meta["categorias"].astype(str).apply(
 df_meta = df_meta.drop_duplicates(subset="appid", keep="first")
 metadata_dict = df_meta.set_index("appid")[["descripcion", "categorias"]].to_dict(orient="index")
 
-# === Detectar juegos gratuitos ===
-FREE_KEYWORDS = {"free to play", "free-to-play", "f2p", "juego gratuito", "gratuito", "gratis"}
-
-def es_juego_gratuito(appid, meta):
-    if appid not in meta:
-        return False
-    texto = meta[appid]["descripcion"] + " " + " ".join(meta[appid]["categorias"])
-    return any(k in texto.lower() for k in FREE_KEYWORDS)
-
-# === Crear secuencias para Word2Vec (excluyendo juegos gratuitos) ===
+# === Crear secuencias para Word2Vec (sin juegos gratuitos) ===
 user_sequences_weighted = []
 
 for steam_id, group in tqdm(df.groupby("steam_id"), desc="🔁 Generando secuencias sin juegos gratuitos"):
@@ -95,8 +91,8 @@ for steam_id, group in tqdm(df.groupby("steam_id"), desc="🔁 Generando secuenc
     for _, row in group.iterrows():
         appid = row["appid"]
 
-        # ❌ Excluir juegos gratuitos por completo
-        if es_juego_gratuito(appid, metadata_dict):
+        # ⚠️ Excluir si no está en metadata (posiblemente juego gratuito o sin info)
+        if appid not in metadata_dict:
             continue
 
         playtime = row["playtime_forever"]
@@ -107,11 +103,7 @@ for steam_id, group in tqdm(df.groupby("steam_id"), desc="🔁 Generando secuenc
         recent_factor = 1.0 + min(playtime_2w / 1800, 0.5)
         peso = int(base_peso * pop_factor * recent_factor)
 
-        contexto = []
-        if appid in metadata_dict:
-            contexto += metadata_dict[appid]["descripcion"].split()
-            contexto += metadata_dict[appid]["categorias"]
-
+        contexto = metadata_dict[appid]["descripcion"].split() + metadata_dict[appid]["categorias"]
         juegos.extend([appid] * peso)
         juegos.extend(contexto)
 

@@ -1,112 +1,288 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Steamia | Carrito</title>
-    <link rel="stylesheet" href="/static/header.css">
-    <link rel="stylesheet" href="/static/carrito.css">
-    <script src="/static/header.js"></script>
-    <link rel="icon" href="/static/logo.png" type="image/png">
+  <meta charset="UTF-8">
+  <title>Steamia | Carrito</title>
+  <link rel="stylesheet" href="/static/header.css">
+  <link rel="icon" href="/static/logo.png" type="image/png">
+  <script src="/static/header.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #1b2838;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    main {
+      flex: 1;
+      padding: 90px 40px 40px;
+      max-width: 90%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1, h2 {
+      margin-bottom: 20px;
+    }
+
+    .carrito-lista {
+      background-color: #3a5a97;
+      border-radius: 30px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+      box-sizing: border-box;
+    }
+
+    .carrito-item {
+      display: flex;
+      align-items: center;
+      background-color: #003366;
+      padding: 15px;
+      border-radius: 8px;
+      gap: 15px;
+    }
+
+    .carrito-item img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid #1b2838;
+    }
+
+    .carrito-info {
+      flex: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+    }
+
+    .carrito-info p {
+      margin: 5px 0;
+    }
+
+    .carrito-info form {
+      margin-left: 20px;
+    }
+
+    .carrito-info button {
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .carrito-info button:hover {
+      background-color: #c0392b;
+    }
+
+    form[action="/comprar"] {
+      margin-top: 30px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: nowrap;
+      justify-content: center;
+    }
+
+    form[action="/comprar"] input[type="email"] {
+      padding: 12px 20px;
+      border-radius: 30px;
+      border: none;
+      font-size: 16px;
+      width: 50%;
+      max-width: 265px;
+      background-color: #4a65e5;
+      color: white;
+      outline: none;
+    }
+
+    form[action="/comprar"] input[type="email"]::placeholder {
+      color: #d3d3d3;
+    }
+
+    form[action="/comprar"] button {
+      padding: 4px 20px;
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background-color: #2ecc71;
+      color: #1b2838;
+      transition: background 0.3s ease;
+    }
+
+    form[action="/comprar"] button:hover {
+      background-color: #27ae60;
+    }
+
+    .recomendaciones-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      overflow-x: auto;
+      padding: 20px 0;
+      box-sizing: border-box;
+    }
+
+    .recomendaciones-scroll {
+      display: flex;
+      gap: 20px;
+      min-width: fit-content;
+      padding: 10px;
+      scroll-behavior: smooth;
+    }
+
+    .recomendaciones-scroll::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .recomendaciones-scroll::-webkit-scrollbar-thumb {
+      background-color: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .recomendaciones-scroll .card {
+      flex: 0 0 auto;
+      width: 200px;
+      background-color: #2a475e;
+      color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s ease;
+    }
+
+    .recomendaciones-scroll .card:hover {
+      transform: scale(1.03);
+    }
+
+    .recomendaciones-scroll .card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+    }
+
+    .recomendaciones-scroll .info {
+      padding: 10px;
+      text-align: center;
+    }
+
+    .recomendaciones-scroll .comprar-btn {
+      display: inline-block;
+      background-color: #66c0f4;
+      padding: 8px 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      color: #1b2838;
+    }
+
+    .recomendaciones-scroll .comprar-btn:hover {
+      background-color: #3a9ee0;
+      color: white;
+    }
+
+    .footer {
+      background-color: #171a21;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+      box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.3);
+    }
+  </style>
 </head>
 <body>
-    <header class="navbar">
-        <div class="logo"><img src="/static/logo.png" alt="Logo"></div>
-        <nav class="menu">
-          <a href="/tienda">Tienda</a>
-          <a href="/biblioteca">Biblioteca</a>
-          <a href="/soporte">Soporte</a>
-          <a href="/carrito">Carrito</a>
-        </nav>
-        <div class="usuario" onclick="toggleDropdown()">
-          <span class="nombre-usuario">{{ nombre }}</span>
-          <img src="{{ avatar }}" alt="Usuario" class="avatar-usuario">
-    
-          <div id="dropdownMenu" class="dropdown hidden">
-            <button onclick="abrirAmigos(event)">Amigos</button>
-            <button onclick="window.location.href='/logout'">Cerrar sesión</button>
-          </div>
-        </div>
-      </header>
- <!-- PANEL DE AMIGOS (popup lateral derecho) -->
- <div id="panel-amigos" class="panel-amigos hidden">
-    <div class="panel-header">
-      <h3>Amigos</h3>
-      <button onclick="cerrarPanelAmigos()" class="cerrar-panel">✖</button>
-    </div>
-    <input type="text" id="buscador-amigos" class="input-buscador-amigos" placeholder="🔍 Buscar amigos...">
-    <div id="lista-amigos"></div>
-  </div>
-    <main class="carrito-contenedor">
+  <header class="navbar">
+    <!-- Tu header como siempre -->
+  </header>
+
+  <main>
     <h1>Mi carrito</h1>
-
     {% if carrito %}
-    <div class="carrito-lista">
+      <div class="carrito-lista">
         {% for juego in carrito %}
-        <div class="carrito-item">
-        <img src="{{ juego.imagen }}" alt="{{ juego.nombre }}">
-        <div class="carrito-info">
-            <p class="juego-nombre">{{ juego.nombre }}</p>
-            <p class="juego-precio">{{ juego.precio_str }}</p>
-            <form method="post" action="/eliminar_del_carrito">
-            <input type="hidden" name="appid" value="{{ juego.appid }}">
-            <button type="submit" class="eliminar-btn">🗑 Eliminar</button>
-            </form>
-        </div>
-        </div>
+          <div class="carrito-item">
+            <img src="{{ juego.imagen }}" alt="{{ juego.nombre }}">
+            <div class="carrito-info">
+              <p class="juego-nombre">{{ juego.nombre }}</p>
+              <p class="juego-precio">{{ juego.precio_str }}</p>
+              <form method="post" action="/eliminar_del_carrito">
+                <input type="hidden" name="appid" value="{{ juego.appid }}">
+                <button type="submit">🗑 Eliminar</button>
+              </form>
+            </div>
+          </div>
         {% endfor %}
-    </div>
-
-    <form method="post" action="/comprar" class="form-compra">
+      </div>
+      <form method="post" action="/comprar">
         <input type="email" name="email" placeholder="Introduce tu correo electrónico" required>
         <button type="submit">Comprar ({{ total_precio }}€)</button>
-    </form>
+      </form>
     {% else %}
-        <p class="vacio">🛒 Tu carrito está vacío.</p>
+      <p class="vacio">🛒 Tu carrito está vacío.</p>
     {% endif %}
 
     <h2>Podría interesarte (MBA)</h2>
-    <div id="recomendaciones-mba" class="recomendaciones">
-      <p>⏳ Cargando recomendaciones...</p>
+    <div class="recomendaciones-wrapper">
+      <div id="recomendaciones-mba" class="recomendaciones-scroll">
+        <p>⏳ Cargando recomendaciones...</p>
+      </div>
     </div>
+  </main>
 
-    </main>
+  <footer class="footer">
+    <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
+  </footer>
 
-    <footer class="footer">
-      <p>&copy; 2025 Steamia - Todos los derechos reservados</p>
-    </footer>
-<script src="static/header.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    fetch("/api/recomendacionesmba_carrito")
-      .then(response => response.json())
-      .then(data => {
-        const contenedor = document.getElementById("recomendaciones-mba");
-        contenedor.innerHTML = ""; // limpiar el texto de "Cargando..."
-
-        if (data.recomendaciones && data.recomendaciones.length > 0) {
-          data.recomendaciones.forEach(juego => {
-            const card = document.createElement("div");
-            card.className = "card";
-
-            card.innerHTML = `
-              <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
-              <div class="info">
-                <h3>${juego.nombre}</h3>
-                <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
-              </div>
-            `;
-            contenedor.appendChild(card);
-          });
-        } else {
-          contenedor.innerHTML = "<p>❌ No se encontraron recomendaciones basadas en tu carrito.</p>";
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        document.getElementById("recomendaciones-mba").innerHTML = "<p>❌ Error al cargar las recomendaciones.</p>";
-      });
-  });
-</script>
-
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      fetch("/api/recomendacionesmba_carrito")
+        .then(response => response.json())
+        .then(data => {
+          const contenedor = document.getElementById("recomendaciones-mba");
+          contenedor.innerHTML = "";
+          if (data.recomendaciones && data.recomendaciones.length > 0) {
+            data.recomendaciones.forEach(juego => {
+              const card = document.createElement("div");
+              card.className = "card";
+              card.innerHTML = `
+                <img src="${juego.imagen || '/static/default.png'}" alt="${juego.nombre}">
+                <div class="info">
+                  <h3>${juego.nombre}</h3>
+                  <a href="/juego/${juego.item_id}" class="comprar-btn">Comprar juego</a>
+                </div>
+              `;
+              contenedor.appendChild(card);
+            });
+          } else {
+            contenedor.innerHTML = "<p>❌ No se encontraron recomendaciones.</p>";
+          }
+        })
+        .catch(() => {
+          document.getElementById("recomendaciones-mba").innerHTML = "<p>❌ Error al cargar recomendaciones.</p>";
+        });
+    });
+  </script>
 </body>
 </html>
